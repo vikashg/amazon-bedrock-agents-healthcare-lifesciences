@@ -1018,383 +1018,6 @@ Resources:
       ProjectName: !Ref DataRetrievalLogic
   
 
-  AgentResource:
-    Type: AWS::Bedrock::Agent
-    DependsOn:
-      - BedrockKnowledgeBase
-      - KnowledgeBaseDataSource
-    Properties:
-      AgentName: !Sub biomarker-agent-${EnvironmentName}
-      AgentResourceRoleArn: !GetAtt AgentRole.Arn
-      AutoPrepare : True
-      FoundationModel: !Ref BedrockModelId
-      Instruction: |
-        You are a medical research assistant AI specialized in generating SQL queries for a database containing medical biomarker information. Your primary task is to interpret user queries, generate appropriate SQL queries, and provide relevant medical insights based on the data. Use only the appropriate tools as required by the specific question. Follow these instructions carefully:
-
-        1. Before generating any SQL query, use the /getschema tool to familiarize yourself with the database structure. This will ensure your queries are correctly formatted and target the appropriate columns.
-
-        2. When generating an SQL query:
-          a. Write the query as a single line, removing all newline ("\n") characters.
-          b. Always try to use aggregation and groupby when applicable.
-          b. Before execution of a step, evaluate the SQL query with the rationale of the specific step by using the /refinesql tool. Provide both the SQL query and a brief rationale for the specific step you're taking. Do not share the original user question with the tool. 
-          c. Only proceed to execute the query using the /queryredshift tool after receiving the evaluated and potentially optimized version from the /refinesql tool.
-
-        3. When querying PubMed:
-          a. Summarize the findings of each relevant study with citations to the specific pubmed web link of the study
-          b. The json output will include  'Link', 'Title', 'Summary'.
-          c. Always return the Title and Link (for example, 'https://pubmed.ncbi.nlm.nih.gov/') of each study in your response. 
-
-        4. If the user query requires a Kaplan-Meier chart:
-          a. Generate the necessary SQL query to retrieve the required data without any aggregation. 
-          c. Map survival status as 0 for Alive and 1 for Dead for the event parameter.
-          d. Use survival duration as the duration parameter.
-          e. Use the /group_survival_data tool to create baseline and condition group based on expression value threshold provided by the user.
-
-        5. If a survival regression analysis is needed:
-          a. Retrieve all records with columns start with survival status as first column, then survival duration, and the required biomarkers.
-          b. Use the /fit_survival_regression tool to identify the best-performing biomarker based on the p-value summary.
-
-        6. For computed tomographic (CT) lung imaging biomarker analysis:
-          a. Identify the patient subject ID(s) based on the conversation.
-          b. Use the compute_imaging_biomarker tool to trigger the long-running job, passing the subject ID(s) as an array of strings (for example, ["R01-043", "R01-93"]).
-          c. Only if specifically asked for an analysis, use the analyze_imaging_biomarker tool to process the results from the previous job.
-
-        7. For literature evidence, make use of the knowledge base to retrieve relevant information.
-
-        8. When you need to create a bar chart or plot:
-          a. Always pass x_values and y_values in Array type to the function. If the user says x values are apple,egg and y values are 3,4 or as [apple,egg] and [3,4] pass their value as ['apple', 'banana'] and [3,4]
-         
-        9. When providing your response:
-          a. Start with a brief summary of your understanding of the user's query.
-          b. Explain the steps you're taking to address the query. Ask for clarifications from the user if required. 
-          c. Present the results of your database queries and any additional analyses.
-          d. If you generate any charts or perform statistical analyses, explain their significance in the context of the user's query.
-          e. Conclude with a concise summary of the findings and their potential implications for medical research.
-
-        Make sure to explain any medical or statistical concepts in a clear, accessible manner.
-
-
-
-      Description: "Agent for querying biomaker database."
-      ActionGroups:
-        - ActionGroupName: 'UserInputAction'
-          ParentActionGroupSignature: 'AMAZON.UserInput'
-          ActionGroupState: 'ENABLED'
-        - ActionGroupName: sqlActionGroup
-          Description: Action for getting the database schema and querying the database
-          ActionGroupExecutor: 
-            Lambda: !GetAtt AgentLambdaFunction.Arn
-          ApiSchema:
-            Payload: |
-              {
-                "openapi": "3.0.1",
-                "info": {
-                  "title": "Database schema look up and query APIs",
-                  "version": "1.0.0",
-                  "description": "APIs for looking up database table schemas and making queries to database tables."
-                },
-                "paths": {
-                  "/getschema": {
-                    "get": {
-                      "summary": "Get a list of all columns in the redshift database",
-                      "description": "Get the list of all columns in the redshift database table. Return all the column information in database table.",
-                      "operationId": "getschema",
-                      "responses": {
-                        "200": {
-                          "description": "Gets the list of table names and their schemas in the database",
-                          "content": {
-                            "application/json": {
-                              "schema": {
-                                "type": "array",
-                                "items": {
-                                  "type": "object",
-                                  "properties": {
-                                    "Table": {
-                                      "type": "string",
-                                      "description": "The name of the table in the database."
-                                    },
-                                    "Schema": {
-                                      "type": "string",
-                                      "description": "The schema of the table in the database. Contains all columns needed for making queries."
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  },
-                  "/queryredshift": {
-                    "get": {
-                      "summary": "API to send query to the redshift database table",
-                      "description": "Send a query to the database table to retrieve information pertaining to the users question. The API takes in only one SQL query at a time, sends the SQL statement and returns the query results from the table. This API should be called for each SQL query to a database table.",
-                      "operationId": "queryredshift",
-                      "parameters": [
-                        {
-                          "name": "query",
-                          "in": "query",
-                          "required": true,
-                          "schema": {
-                            "type": "string"
-                          },
-                          "description": "SQL statement to query database table."
-                        }
-                      ],
-                      "responses": {
-                        "200": {
-                          "description": "Query sent successfully",
-                          "content": {
-                            "application/json": {
-                              "schema": {
-                                "type": "object",
-                                "properties": {
-                                  "responseBody": {
-                                    "type": "string",
-                                    "description": "The query response from the database."
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        },
-                        "400": {
-                          "description": "Bad request. One or more required fields are missing or invalid."
-                        }
-                      }
-                    }
-                  },
-                  "/refinesql": {
-                    "get": {
-                      "summary": "Evaluate SQL query efficiency",
-                      "description": "Evaluate the efficiency of an SQL query based on the provided schema, query, and question.",
-                      "operationId": "refinesql",
-                      "parameters": [
-                        {
-                          "name": "sql",
-                          "in": "query",
-                          "required": true,
-                          "schema": {
-                            "type": "string"
-                          },
-                          "description": "The SQL query to evaluate."
-                        },
-                        {
-                          "name": "question",
-                          "in": "query",
-                          "required": true,
-                          "schema": {
-                            "type": "string"
-                          },
-                          "description": "The question related to the rationale of the specific step."
-                        }
-                      ],
-                      "responses": {
-                        "200": {
-                          "description": "Successful response",
-                          "content": {
-                            "application/json": {
-                              "schema": {
-                                "type": "object",
-                                "properties": {
-                                  "evaluatedQuery": {
-                                    "type": "string",
-                                    "description": "The evaluated SQL query, or the original query if it is efficient."
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        },
-                        "400": {
-                          "description": "Bad request. One or more required fields are missing or invalid."
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-        - ActionGroupName: scientificAnalysisActionGroup
-          Description: Actions for scientific analysis with lifelines library
-          ActionGroupExecutor: 
-            Lambda: !GetAtt ScientificPlotLambdaFunction.Arn
-          FunctionSchema:
-            Functions:
-              - Description: "Plots a Kaplan-Meier survival chart"
-                Name: "plot_kaplan_meier"
-                Parameters:
-                  biomarker_name:
-                    Type: "string"
-                    Description: "name of the biomarker"
-                    Required: true
-                  duration_baseline:
-                    Type: "array"
-                    Description: "duration in number of days for baseline"
-                    Required: true
-                  duration_condition:
-                    Type: "array"
-                    Description: "duration in number of days for condition"
-                    Required: true
-                  event_baseline:
-                    Type: "array"
-                    Description: "survival event for baseline"
-                    Required: true
-                  event_condition:
-                    Type: "array"
-                    Description: "survival event for condition"
-                    Required: true
-              - Description: "Fit a survival regression model with data in a S3 object"
-                Name: "fit_survival_regression"
-                Parameters:
-                  bucket:
-                    Type: "string"
-                    Description: "s3 bucket where the data is stored by the database query tool"
-                    Required: true
-                  key:
-                    Type: "string"
-                    Description: "json file name that is located in the s3 bucket and contains the data for fitting the model"
-                    Required: true
-        - ActionGroupName: imagingBiomarkerProcessing
-          Description: Actions for processing imaging biomarker within CT scans for a list of subjects
-          ActionGroupExecutor: 
-            Lambda: !GetAtt ImagingBiomarkerLambda.Arn
-          FunctionSchema:
-            Functions:
-              - Description: "compute the imaging biomarker features from lung CT scans within the tumor for a list of patient subject ID"
-                Name: "compute_imaging_biomarker"
-                Parameters:
-                  subject_id:
-                    Type: "array"
-                    Description: "an array of patient subject ID"
-                    Required: true
-              - Description: "analyze the result imaging biomarker features from lung CT scans within the tumor for a list of patient subject ID"
-                Name: "analyze_imaging_biomarker"
-                Parameters:
-                  subject_id:
-                    Type: "array"
-                    Description: "an array of patient subject ID"
-                    Required: true
-        - ActionGroupName: survivalDataProcessing
-          Description: Process survival data of patients in order to invoke other tools
-          ActionGroupExecutor: 
-            Lambda: !GetAtt SurvivalDataProcessingLambdaFunction.Arn
-          FunctionSchema:
-            Functions:
-              - Description: "Group based on threshold values"
-                Name: "group_survival_data"
-                Parameters:
-                  biomarker:
-                    Type: "array"
-                    Description: "biomarker expression values, code input not accepted"
-                    Required: true
-                  survival_duration:
-                    Type: "array"
-                    Description: "survival duration values, code input not accepted"
-                    Required: true
-                  survival_status:
-                    Type: "array"
-                    Description: "survival status values, code input not accepted"
-                    Required: true
-                  threshold:
-                    Type: "number"
-                    Description: "Threshold value, code input not accepted"
-                    Required: true
-
-        - ActionGroupName: matplotbarchart
-          Description: Creates a bar chart from the given input values
-          ActionGroupExecutor: 
-            Lambda: !GetAtt MatPlotBarChartLambdaFunction.Arn
-          FunctionSchema:
-            Functions:
-              - Description: "create a bar chart"
-                Name: "bar_chart"
-                Parameters:
-                  title:
-                    Type: "string"
-                    Description: "title of the bar chart"
-                    Required: true
-                  x_values:
-                    Type: "array"
-                    Description: "values for the x a xis"
-                    Required: true
-                  y_values:
-                    Type: "array"
-                    Description: "values for the y axis"
-                    Required: true
-                  x_label:
-                    Type: "string"
-                    Description: "title of the x axis"
-                    Required: true
-                  y_label:
-                    Type: "string"
-                    Description: "title of the y axis"
-                    Required: true
-
-        - ActionGroupName: queryPubMed
-          Description: Actions for fetching biomedical literature from PubMed
-          ActionGroupExecutor: 
-            Lambda: !GetAtt QueryPubMedLambdaFunction.Arn
-          ApiSchema:
-            Payload: |
-                {
-                    "openapi": "3.0.0",
-                    "info": {
-                        "title": "fetch biomedical literature",
-                        "version": "1.0.0",
-                        "description": "PubMed API to help answer users question using abstracts from biomedical literature."
-                    },
-                    "paths": {
-                        "/query-pubmed": {
-                            "post": {
-                                "summary": "Query pubmed to relevant information from abstracts of biomedical articles.",
-                                "description": "Query pubmed to relevant information from abstracts of biomedical articles. The PubMed API takes in the user query then returns the abstracts of top 5 relevant articles.",
-                                "operationId": "query-pubmed",
-                                "parameters": [
-                                    {
-                                        "name": "query",
-                                        "in": "query",
-                                        "description": "user query",
-                                        "required": true,
-                                        "schema": {
-                                            "type": "string"
-                                        }
-                                    }
-                                ],                
-                                "responses": {
-                                    "200": {
-                                        "description": "Query pubmed to relevant information from abstracts of biomedical articles.",
-                                        "content": {
-                                            "application/json": {
-                                                "schema": {
-                                                    "type": "object",
-                                                    "properties": {
-                                                        "answer": {
-                                                            "type": "string",
-                                                            "description": "The response to user query with list of pubmed article abstracts."
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-      KnowledgeBases:
-          - KnowledgeBaseId: !Ref BedrockKnowledgeBase
-            Description: Literature evidence on Relationships between Molecular and Imaging Phenotypes with Prognostic Implications
-
-
-      
-  
-  AgentAliasResource:
-    Type: AWS::Bedrock::AgentAlias
-    Properties:
-      AgentId: !GetAtt AgentResource.AgentId
-      AgentAliasName: !Sub biomakers-alias
       
 
   AgentRole:
@@ -1422,381 +1045,7 @@ Resources:
                 Resource: 
                   - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModelId}
                   - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${BedrockKnowledgeBase}
-      
-  ########################
-  ##### ActionGroup #####
-  ######################
-
-  AgentLambdaFunction:
-    Type: AWS::Lambda::Function
-    DependsOn: TriggerDataRetrievalLogic
-    Properties:
-      Runtime: python3.12
-      FunctionName: !Sub biomarker-agent-${EnvironmentName}
-      Handler: querydatabaselambda.lambda_handler
-      Role: !GetAtt AgentLambdaRole.Arn
-      Timeout: 900
-      Environment:
-        Variables:
-          BUCKET_NAME: !Ref S3Bucket
-      Code:
-        S3Bucket: !Ref S3Bucket
-        S3Key: querydatabaselambda.zip
-      
-
-  AgentLambdaRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - lambda.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      Policies:
-        - PolicyName: AgentLambdaPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Sid: LambdaExecution
-                Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
-              - Sid: RedshiftDataAccess
-                Effect: Allow
-                Action:
-                  - redshift-data:ExecuteStatement
-                  - redshift-data:DescribeStatement
-                  - redshift-data:GetStatementResult
-                  - redshift-data:ListStatements
-                Resource: '*'
-              - Sid: RedshiftCredentials
-                Effect: Allow
-                Action:
-                  - redshift:GetClusterCredentials
-                Resource: 
-                  - !Sub arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:dbuser:biomarker-redshift-cluster/admin
-                  - !Sub arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:dbname:biomarker-redshift-cluster/dev
-              - Sid: S3Access
-                Effect: Allow
-                Action:
-                  - s3:PutObject
-                  - s3:GetObject
-                Resource: 
-                  - !Sub arn:aws:s3:::${S3Bucket}/*
-              - Sid: BedrockAccess
-                Effect: Allow
-                Action:
-                  - bedrock:InvokeModel
-                Resource: !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0
-                    
-                
-  AgentLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !GetAtt AgentLambdaFunction.Arn
-      Principal: bedrock.amazonaws.com
-      SourceArn: !GetAtt AgentResource.AgentArn
-
-  ScientificPlotLambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
-      Policies:
-        - PolicyName: S3ObjectPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:PutObject
-                  - s3:GetObject
-                Resource: !Sub 'arn:aws:s3:::${S3Bucket}/*'
-
-  ScientificPlotLambdaFunction:
-    Type: AWS::Lambda::Function
-    DependsOn: EnsureECRImagePushed
-    Properties:
-      FunctionName: ScientificPlotLambda
-      PackageType: Image
-      Code:
-        ImageUri: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ECRRepository}:${ImageTag}
-      Role: !GetAtt ScientificPlotLambdaExecutionRole.Arn
-      MemorySize: 512
-      Timeout: 900
-      Environment:
-        Variables:
-          S3_BUCKET: !Ref S3Bucket
   
-  ScientificPlotLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !GetAtt ScientificPlotLambdaFunction.Arn
-      Principal: bedrock.amazonaws.com
-      SourceArn: !GetAtt AgentResource.AgentArn
-  
-  QueryPubMedLambdaRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: 'sts:AssumeRole'
-      Policies:
-        - PolicyName: CloudWatchLogsAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'logs:CreateLogGroup'
-                  - 'logs:CreateLogStream'
-                  - 'logs:PutLogEvents'
-                Resource: 
-                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/PubMedQueryFunction-*'
-                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/PubMedQueryFunction-*:log-stream:*'
-
-  QueryPubMedLambdaFunction:
-    Type: 'AWS::Lambda::Function'
-    DependsOn: ScientificPlotLambdaFunction
-    Properties:
-      FunctionName: PubMedQueryFunction
-      Handler: lambda_function.lambda_handler
-      Role: !GetAtt QueryPubMedLambdaRole.Arn
-      Code:
-        S3Bucket: !Ref S3Bucket
-        S3Key: pubmed-lambda-function.zip
-      Runtime: python3.11
-      Timeout: 30
-      MemorySize: 128
-
-  QueryPubMedLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !GetAtt QueryPubMedLambdaFunction.Arn
-      Principal: bedrock.amazonaws.com
-      SourceArn: !GetAtt AgentResource.AgentArn
-  
-  SurvivalDataProcessingLambdaRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: 'sts:AssumeRole'
-      Policies:
-        - PolicyName: CloudWatchLogsAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - 'logs:CreateLogGroup'
-                  - 'logs:CreateLogStream'
-                  - 'logs:PutLogEvents'
-                Resource: 
-                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/SurvivalDataProcessingFunction-*'
-                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/SurvivalDataProcessingFunction-*:log-stream:*'
-       
-
-  SurvivalDataProcessingLambdaFunction:
-    Type: 'AWS::Lambda::Function'
-    DependsOn: 
-      - DataRetrievalLogic
-      - ImagingBiomarkerLambda
-    Properties:
-      FunctionName: SurvivalDataProcessingFunction
-      Handler: survivaldataprocessinglambda.lambda_handler
-      Role: !GetAtt SurvivalDataProcessingLambdaRole.Arn
-      Code:
-        S3Bucket: !Ref S3Bucket
-        S3Key: survivaldataprocessinglambda.zip
-      Runtime: python3.12
-      Timeout: 30
-      MemorySize: 128
-
-  SurvivalDataProcessingLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !GetAtt SurvivalDataProcessingLambdaFunction.Arn
-      Principal: bedrock.amazonaws.com
-      SourceArn: !GetAtt AgentResource.AgentArn
-  
-  ImagingBiomarkerLambda:
-    Type: AWS::Lambda::Function
-    DependsOn: EnsureECRImagePushed
-    Properties:
-      FunctionName: imaging-biomarker-lambda
-      Handler: dummy_lambda.lambda_handler
-      Role: !GetAtt ImagingLambdaExecutionRole.Arn
-      Code:
-        S3Bucket: !Ref S3Bucket 
-        S3Key: Imaginglambdafunction.zip  
-      Runtime: python3.12
-      Timeout: 300
-      MemorySize: 256
-      Environment:
-        Variables:
-          SFN_STATEMACHINE_NAME: !GetAtt ImagingStateMachine.Name
-          REGION: !Sub ${AWS::Region}
-          ACCOUNTID: !Sub ${AWS::AccountId}
-          S3BUCKET: !Sub s3://${S3Bucket}
-      Layers:
-        - !FindInMap [RegionMap, !Ref 'AWS::Region', PandasLayer]
-
-  ImagingLambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub 'ImagingBiomarkerLambdaExecutionRole-${AWS::Region}'
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: ImagingLambdaExecutionPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: arn:aws:logs:*:*:*
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:PutObject
-                  - s3:ListBucket
-                Resource:
-                  - !Sub arn:aws:s3:::${S3Bucket}
-                  - !Sub arn:aws:s3:::${S3Bucket}/*
-              - Effect: Allow
-                Action:
-                  - states:StartExecution
-                Resource: !Ref ImagingStateMachine
-    
-  ImagingLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !GetAtt ImagingBiomarkerLambda.Arn
-      Principal: bedrock.amazonaws.com
-      SourceArn: !GetAtt AgentResource.AgentArn
-
-  #------Add New Actions Here -----#
-
-  MatPlotBarChartLambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-      Policies:
-        - PolicyName: MatPlotBarChartLambdaPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:PutObject
-                  - s3:GetObject
-                  - s3:ListBucket
-                Resource: 
-                - !Sub 'arn:aws:s3:::${S3Bucket}'
-                - !Sub 'arn:aws:s3:::${S3Bucket}/*'
-
-  MatplotlibLayer:
-    Type: AWS::Lambda::LayerVersion
-    DependsOn: ScientificPlotLambdaFunction
-    Properties:
-      LayerName: matplotliblayer
-      Description: Layer containing matplotlib and its dependencies
-      Content:
-        S3Bucket: !Ref S3Bucket
-        S3Key: lambda-layer.zip
-      CompatibleRuntimes:
-        - python3.11
-    
-
-  MatPlotBarChartLambdaFunction:
-    Type: AWS::Lambda::Function
-    DependsOn: ImagingBiomarkerLambda
-    Properties:
-      FunctionName: MatPlotBarChartLambda
-      Handler: matplotbarchartlambda.handler  
-      Role: !GetAtt MatPlotBarChartLambdaExecutionRole.Arn  
-      Code:
-        S3Bucket: !Ref S3Bucket 
-        S3Key: matplotbarchartlambda.zip  
-      Runtime: python3.11  
-      Timeout: 500
-      MemorySize: 128
-      Layers:
-        - !Ref MatplotlibLayer
-      Environment:
-        Variables:
-          S3_BUCKET: !Ref S3Bucket
-
-
-  MatPlotBarChartLambdaPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !GetAtt MatPlotBarChartLambdaFunction.Arn
-      Principal: bedrock.amazonaws.com
-      SourceArn: !GetAtt AgentResource.AgentArn
-
-
-  AgentIdSSMParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /streamlitapp/${EnvironmentName}/AGENT_ID
-      Type: String
-      Value: !GetAtt AgentResource.AgentId
-      Description: !Sub SSM parameter for AgentId for ${EnvironmentName}
-
-  AgentAliasIdSSMParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /streamlitapp/${EnvironmentName}/AGENT_ALIAS_ID
-      Type: String
-      Value: !GetAtt AgentAliasResource.AgentAliasId
-      Description: !Sub SSM parameter for AgentAliasId for ${EnvironmentName}
 
 
   S3BucketNameSSMParameter:
@@ -1807,551 +1056,231 @@ Resources:
       Value: !Ref S3Bucket
       Description: !Sub SSM parameter for S3 bucket name for ${EnvironmentName}
 
-  
-  # enableCodeInterpreter:
-  #   Type: Custom::enableCodeInterpreter
+#Supervisor Agent
+  # SupervisorAgent:
+  #   Type: AWS::CloudFormation::Stack
   #   DependsOn: 
-  #     - AgentAliasResource
-  #     - AgentAliasIdSSMParameter
+  #     - BiomarkerAnalyst
+  #     - Statistician
+  #     - MedicalImagingAgent
+  #     - ClinicalEvidence
   #   Properties:
-  #     ServiceToken: !GetAtt CodeInterpreterLambda.Arn
-  #     agentId: !GetAtt AgentResource.AgentId
-  #     agentVersion: !GetAtt AgentResource.AgentVersion
+  #     TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_agent_build.yaml
+  #     Parameters:
+  #       BedrockModelId: !Ref BedrockModelId
+  #       EnvironmentName: !Ref EnvironmentName
+  #       GitBranch: !Ref GitBranch
+  #     TimeoutInMinutes: 30
 
-  # CodeInterpreterLambda:
-  #   Type: AWS::Lambda::Function
+
+
+# Subagents 
+  # BiomarkerAnalyst:
+  #   Type: AWS::CloudFormation::Stack
+  #   DependsOn: TriggerDataRetrievalLogic
   #   Properties:
-  #     Handler: index.handler
-  #     Role: !GetAtt CodeInterpreterLambdaRole.Arn
-  #     Code:
-  #       ZipFile: |
-  #         import boto3
-  #         import cfnresponse
-  #         import os
-  #         import time
-
-  #         def create_ssm_parameter(environment_name, agent_alias_id):
-  #             ssm_client = boto3.client('ssm')
-  #             parameter_name = f"/streamlitapp/{environment_name}/AGENT_ALIAS_ID"
-  #             parameter_value = agent_alias_id
-  #             parameter_type = "String"
-  #             parameter_description = f"SSM parameter for AgentAliasId for {environment_name}"
-
-  #             try:
-  #                 ssm_client.put_parameter(
-  #                     Name=parameter_name,
-  #                     Value=parameter_value,
-  #                     Type=parameter_type,
-  #                     Description=parameter_description,
-  #                     Overwrite=True
-  #                 )
-  #                 print(f"SSM Parameter '{parameter_name}' created/updated successfully.")
-  #             except Exception as e:
-  #                 print(f"Error creating/updating SSM Parameter: {str(e)}")
-  #                 raise
-
-  #         def get_ssm_parameter(environment_name):
-  #             ssm_client = boto3.client('ssm')
-  #             parameter_name = f"/streamlitapp/{environment_name}/AGENT_ALIAS_ID"
-              
-  #             try:
-  #                 response = ssm_client.get_parameter(Name=parameter_name)
-  #                 return response['Parameter']['Value']
-  #             except ssm_client.exceptions.ParameterNotFound:
-  #                 print(f"SSM Parameter '{parameter_name}' not found.")
-  #                 return None
-  #             except Exception as e:
-  #                 print(f"Error retrieving SSM Parameter: {str(e)}")
-  #                 raise
-
-  #         def prepare_agent(client, agent_id):
-  #             MAX_ATTEMPTS = 30
-  #             DELAY_SECONDS = 10
-  #             agentPrep = client.prepare_agent(agentId=agent_id)
-
-  #             for attempt in range(MAX_ATTEMPTS):
-  #                 print(f"Agent status is: {agentPrep['agentStatus']} (Attempt {attempt + 1}/{MAX_ATTEMPTS})")
-  #                 response = client.get_agent(agentId=agent_id)
-  #                 agentStatus=response['agent']['agentStatus']
-                  
-  #                 if agentStatus == 'PREPARED':
-  #                     return True
-  #                 elif agentStatus == 'FAILED':
-  #                     return False
-                  
-  #                 if attempt < MAX_ATTEMPTS - 1:
-  #                     time.sleep(DELAY_SECONDS)
-
-  #             return False
-
-  #         def handler(event, context):
-  #             client = boto3.client('bedrock-agent')
-  #             environment_name = os.environ['ENVIRONMENT_NAME']
-              
-  #             try:
-  #                 if event['RequestType'] in ['Create', 'Update']:
-  #                     response = client.create_agent_action_group(
-  #                         actionGroupName='CodeInterpreterAction',
-  #                         actionGroupState='ENABLED',
-  #                         agentId=os.environ['agentId'],
-  #                         agentVersion=os.environ['agentVersion'],
-  #                         parentActionGroupSignature='AMAZON.CodeInterpreter'
-  #                     )
-  #                     agent_id = os.environ['agentId']
-                      
-  #                     if not prepare_agent(client, agent_id):
-  #                         raise Exception("Agent failed to prepare or preparation timed out")
-
-  #                     agentAlias = client.create_agent_alias(agentAliasName='v2', agentId=agent_id)
-  #                     agent_alias_id = agentAlias['agentAlias']['agentAliasId']
-                  
-  #                     # Create SSM parameter
-  #                     create_ssm_parameter(environment_name, agent_alias_id)
-                      
-  #                     cfnresponse.send(event, context, cfnresponse.SUCCESS, {"Message": "Action group and SSM parameter created successfully"})
-  #                 elif event['RequestType'] == 'Delete':
-  #                     # Retrieve the agent alias ID from SSM
-  #                     agent_alias_id = get_ssm_parameter(environment_name)
-                      
-  #                     if agent_alias_id:
-  #                         # Delete the agent alias
-  #                         response = client.delete_agent_alias(agentAliasId=agent_alias_id, agentId=os.environ['agentId'])
-  #                         print(f"Agent alias {agent_alias_id} deleted successfully.")
-                          
-  #                         cfnresponse.send(event, context, cfnresponse.SUCCESS, {"Message": "Agent alias and SSM parameter deleted successfully"})
-  #                     else:
-  #                         cfnresponse.send(event, context, cfnresponse.SUCCESS, {"Message": "No agent alias found to delete"})
-  #                 else:
-  #                     cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": "Unsupported request type"})
-  #             except Exception as e:
-  #                 print(f"Error: {str(e)}")
-  #                 cfnresponse.send(event, context, cfnresponse.FAILED, {"Error": str(e)})
-
-  #     Runtime: python3.12
-  #     Timeout: 300
-  #     Environment:
-  #       Variables:
-  #         agentId: !GetAtt AgentResource.AgentId
-  #         agentVersion: !GetAtt AgentResource.AgentVersion
-  #         ENVIRONMENT_NAME: !Ref EnvironmentName
-
-  # CodeInterpreterLambdaRole:
-  #   Type: AWS::IAM::Role
+  #     TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_agent_build.yaml
+  #     Parameters:
+  #       BedrockModelId: !Ref BedrockModelId
+  #       EnvironmentName: !Ref EnvironmentName
+  #       GitBranch: !Ref GitBranch
+  #       AgentRole: !GetAtt AgentRole.Arn
+  #     TimeoutInMinutes: 30
+  
+  # Statistician:
+  #   Type: AWS::CloudFormation::Stack
+  #   DependsOn: EnsureECRImagePushed
   #   Properties:
-  #     AssumeRolePolicyDocument:
-  #       Version: '2012-10-17'
-  #       Statement:
-  #         - Effect: Allow
-  #           Principal:
-  #             Service:
-  #               - lambda.amazonaws.com
-  #           Action:
-  #             - sts:AssumeRole
-  #     Policies:
-  #       - PolicyName: CloudWatchLogsPolicy
-  #         PolicyDocument:
-  #           Version: '2012-10-17'
-  #           Statement:
-  #             - Effect: Allow
-  #               Action:
-  #                 - logs:CreateLogGroup
-  #                 - logs:CreateLogStream
-  #                 - logs:PutLogEvents
-  #               Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
-  #       - PolicyName: BedrockAgentPolicy
-  #         PolicyDocument:
-  #           Version: '2012-10-17'
-  #           Statement:
-  #             - Effect: Allow
-  #               Action:
-  #                 - bedrock:CreateAgentActionGroup
-  #                 - bedrock:PrepareAgent
-  #                 - bedrock:CreateAgentAlias
-  #                 - bedrock:DeleteAgentAlias
-  #                 - bedrock:GetAgent
-  #               Resource: !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/${AgentResource}
-  #       - PolicyName: BedrockAgentAliasPolicy
-  #         PolicyDocument:
-  #           Version: '2012-10-17'
-  #           Statement:
-  #             - Effect: Allow
-  #               Action:
-  #                 - bedrock:CreateAgentAlias
-  #                 - bedrock:DeleteAgentAlias
-  #               Resource: !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*
-  #       - PolicyName: SSMParameterPolicy
-  #         PolicyDocument:
-  #           Version: '2012-10-17'
-  #           Statement:
-  #             - Effect: Allow
-  #               Action:
-  #                 - ssm:GetParameter
-  #                 - ssm:PutParameter
-  #               Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/streamlitapp/*
-  BedrockKBExecutionRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      RoleName: !Sub 'AmazonBedrockExecutionRoleForKnowledgeBase_${EnvironmentName}_${AWS::Region}'
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: 
-                - bedrock.amazonaws.com
-            Action: sts:AssumeRole
-            Condition:
-              StringEquals:
-                aws:SourceAccount: !Ref 'AWS::AccountId'
-              ArnLike:
-                aws:SourceArn: !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*'
-      Policies:
-      - PolicyName: FoundationModelPolicy
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-            - bedrock:InvokeModel
-            Resource: 
-              - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v1'
-              - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0'
-            Sid: BedrockInvokeModelStatement
-      - PolicyName: OSSPolicy
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-            - aoss:APIAccessAll
-            Resource: !Sub 'arn:aws:aoss:${AWS::Region}:${AWS::AccountId}:collection/${Collection}'
-            Sid: OpenSearchServerlessAPIAccessAllStatement
-      - PolicyName: S3Policy
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-            - s3:ListBucket
-            Resource: !Sub 'arn:aws:s3:::${S3Bucket}'
-            Sid: S3ListBucketStatement
-          - Effect: Allow
-            Action:
-            - s3:GetObject
-            Resource: !Sub 'arn:aws:s3:::${S3Bucket}/*'
-            Sid: S3GetObjectStatement
-
-  EncryptionPolicy:
-    Type: 'AWS::OpenSearchServerless::SecurityPolicy'
-    Properties:
-      Name: !Sub '${EnvironmentName}-encryption-policy'
-      Type: encryption
-      Description: !Sub 'Encryption policy for ${AWS::StackName} collection'
-      Policy: !Sub |
-        {
-          "Rules": [
-            {
-              "ResourceType": "collection",
-              "Resource": ["collection/${EnvironmentName}-${VectorStoreName}"]
-            }
-          ],
-          "AWSOwnedKey": true
-        }
-
-  NetworkPolicy:
-    Type: 'AWS::OpenSearchServerless::SecurityPolicy'
-    Properties:
-      Name: !Sub '${EnvironmentName}-network-policy'
-      Type: network
-      Description: !Sub 'Network policy for ${AWS::StackName} collection'
-      Policy: !Sub |
-        [
-          {
-            "Rules": [
-              {
-                "ResourceType": "collection",
-                "Resource": ["collection/${EnvironmentName}-${VectorStoreName}"]
-              }
-            ],
-            "AllowFromPublic": true
-          }
-        ]
-
-  Collection:
-    Type: 'AWS::OpenSearchServerless::Collection'
-    Properties:
-      Name: !Sub '${EnvironmentName}-${VectorStoreName}'
-      Type: VECTORSEARCH
-      Description: !Sub 'Collection to hold vector for ${AWS::StackName}'
-    DependsOn: 
-      - EncryptionPolicy
-      - NetworkPolicy
-
-  OpenSearchIndexLambdaRole:
+  #     TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_agent_build.yaml
+  #     Parameters:
+  #       BedrockModelId: !Ref BedrockModelId
+  #       EnvironmentName: !Ref EnvironmentName
+  #       GitBranch: !Ref GitBranch
+  #       AgentRole: !GetAtt AgentRole.Arn
+  #     TimeoutInMinutes: 30
+  
+  # MedicalImagingAgent:
+  #   Type: AWS::CloudFormation::Stack
+  #   DependsOn: EnsureECRImagePushed
+  #   Properties:
+  #     TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_agent_build.yaml
+  #     Parameters:
+  #       BedrockModelId: !Ref BedrockModelId
+  #       EnvironmentName: !Ref EnvironmentName
+  #       GitBranch: !Ref GitBranch
+  #       AgentRole: !GetAtt AgentRole.Arn
+  #     TimeoutInMinutes: 30
+  
+  # ClinicalEvidence:
+  #   Type: AWS::CloudFormation::Stack
+  #   DependsOn: 
+  #     - TriggerDataRetrievalLogic
+  #   Properties:
+  #     TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_agent_build.yaml
+  #     Parameters:
+  #       BedrockModelId: !Ref BedrockModelId
+  #       EnvironmentName: !Ref EnvironmentName
+  #       GitBranch: !Ref GitBranch
+  #       AgentRole: !GetAtt AgentRole.Arn
+  #     TimeoutInMinutes: 30
+  LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-17'
+        Version: '2012-10-01'
         Statement:
           - Effect: Allow
             Principal:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: LambdaBasicExecution
+        - PolicyName: AgentManagementPolicy
           PolicyDocument:
-            Version: '2012-10-17'
+            Version: '2012-10-01'
             Statement:
               - Effect: Allow
                 Action:
-                  - 'logs:CreateLogGroup'
-                  - 'logs:CreateLogStream'
-                  - 'logs:PutLogEvents'
-                Resource: 'arn:aws:logs:*:*:*'
-        - PolicyName: allowAoss
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-            - Effect: Allow
-              Action:
-              - aoss:APIAccessAll
-              - aoss:List*
-              - aoss:Get*
-              - aoss:Create*
-              - aoss:Update*
-              - aoss:Delete*
-              Resource: 'arn:aws:logs:*:*:*'
+                  - s3:ListBucket
+                  - s3:GetObject
+                Resource: 
+                  - !Sub arn:aws:s3:::${S3Bucket}
+                  - !Sub arn:aws:s3:::${S3Bucket}/*
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${EnvironmentName}-*/*
 
-  OpenSearchIndexLambda:
+  
+  AgentDiscoveryFunction:
     Type: AWS::Lambda::Function
     Properties:
+      Runtime: python3.8
       Handler: index.handler
-      Role: !GetAtt OpenSearchIndexLambdaRole.Arn
+      Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         ZipFile: |
           import boto3
           import cfnresponse
-          import json
-          import time
-          from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
-
-          def create_index_with_retry(client, index_name, index_body, max_retries=5, base_delay=5):
-              for attempt in range(max_retries):
-                  try:
-                      response = client.indices.create(index=index_name, body=json.dumps(index_body))
-                      print(f"Index created: {response}")
-                      return True
-                  except Exception as e:
-                      print(f"Attempt {attempt + 1} failed: {str(e)}")
-                      if attempt < max_retries - 1:
-                          delay = base_delay * (2 ** attempt)  # Exponential backoff
-                          print(f"Retrying in {delay} seconds...")
-                          time.sleep(delay)
-                      else:
-                          print("Max retries reached. Index creation failed.")
-                          return False
-
+          
           def handler(event, context):
+            try:
               if event['RequestType'] in ['Create', 'Update']:
-                  try:
-                      collection_name = event['ResourceProperties']['CollectionName']
-                      index_name = event['ResourceProperties']['IndexName']
-                      collection_id = event["ResourceProperties"]["CollectionId"]
-                      region = event["ResourceProperties"]["Region"]
-                      
-                      print(f"Collection Name: {collection_name}")
-                      print(f"Index Name: {index_name}")
-                      print(f"Collection ID: {collection_id}")
-                      print(f"Region: {region}")
-                      
-                      service = 'aoss'
-                      host = f"{collection_id}.{region}.{service}.amazonaws.com"
-                      credentials = boto3.Session().get_credentials()
-                      awsauth = AWSV4SignerAuth(credentials, region, service)
-                      
-                      client = OpenSearch(
-                          hosts=[{'host': host, 'port': 443}],
-                          http_auth=awsauth,
-                          use_ssl=True,
-                          verify_certs=True,
-                          connection_class=RequestsHttpConnection,
-                          pool_maxsize=20,
-                      )
-                      
-                      # Updated index_body to match Amazon Titan model specifications
-                      index_body = {
-                          "settings": {
-                              "index": {
-                                  "knn": True,
-                                  "knn.algo_param.ef_search": 512
-                              }
-                          },
-                          "mappings": {
-                              "properties": {
-                                  "bedrock-knowledge-base-default-vector": {
-                                      "type": "knn_vector",
-                                      "dimension": 1536,
-                                      "method": {
-                                          "name": "hnsw",
-                                          "engine": "faiss",
-                                          "parameters": {
-                                              "ef_construction": 512,
-                                              "m": 16
-                                          },
-                                          "space_type": "l2",
-                                      },
-                                  },
-                                  "AMAZON_BEDROCK_METADATA": {
-                                      "type": "text",
-                                      "index": "false"
-                                  },
-                                  "AMAZON_BEDROCK_TEXT_CHUNK": {
-                                      "type": "text",
-                                      "index": "true"
-                                  },
-                              }
-                          }
-                      }
-                      
-                      # Initial delay before attempting to create the index
-                      print("Waiting 50 seconds before attempting to create the index...")
-                      time.sleep(50)
-                      
-                      # Attempt to create the index with retry logic
-                      if create_index_with_retry(client, index_name, index_body):
-                          print("Waiting 60 seconds for the index to be fully created...")
-                          time.sleep(60)
-                          cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-                      else:
-                          raise Exception("Failed to create index after multiple attempts")
-                  
-                  except Exception as e:
-                      print(f"Error: {str(e)}")
-                      cfnresponse.send(event, context, cfnresponse.FAILED, {})
+                s3 = boto3.client('s3')
+                bucket = event['ResourceProperties']['BucketName']
+                response = s3.list_objects_v2(
+                  Bucket=bucket,
+                  Prefix='packaged_'
+                )
+                
+                # Get list of agent templates, excluding supervisor and streamlit
+                agents = []
+                for obj in response.get('Contents', []):
+                  if obj['Key'].startswith('packaged_') and obj['Key'].endswith('.yaml'):
+                    agent_name = obj['Key'].replace('packaged_', '').replace('.yaml', '')
+                    if agent_name not in ['supervisor_agent', 'streamlit_build']:
+                      agents.append(agent_name)
+                
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                  'Agents': agents
+                })
               else:
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+            except Exception as e:
+              cfnresponse.send(event, context, cfnresponse.FAILED, {
+                'Error': str(e)
+              })
 
-      Runtime: python3.12
-      Timeout: 900
-      Layers: 
-        - !FindInMap [RegionMap, !Ref 'AWS::Region', PandasLayer]
-
-  CreateOpenSearchIndex:
-    Type: Custom::CreateOpenSearchIndex
+  # Custom Resource to discover agents
+  AgentDiscovery:
+    Type: Custom::AgentDiscovery
     Properties:
-      ServiceToken: !GetAtt OpenSearchIndexLambda.Arn
-      CollectionName: !Sub '${AWS::StackName}-${VectorStoreName}'
-      IndexName: !Ref IndexName
-      CollectionId: !GetAtt Collection.Id
-      Region: !Ref 'AWS::Region'
-    DependsOn:
-      - Collection
-      - BedrockOSSPolicyForKB
+      ServiceToken: !GetAtt AgentDiscoveryFunction.Arn
+      BucketName: !Ref S3Bucket
 
-  BedrockOSSPolicyForKB:
-    Type: AWS::IAM::ManagedPolicy
+  # Dynamic Agent Stacks
+  AgentStacks:
+    Type: Custom::AgentStacks
+    DependsOn: TriggerDataRetrievalLogic
     Properties:
-      ManagedPolicyName: !Sub ${AWS::StackName}-bedrock-oss-policy
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: OpenSearchServerlessAPIAccessAllStatement
-            Effect: Allow
-            Action:
-              - 'aoss:APIAccessAll'
-            Resource: !GetAtt Collection.Arn
-      Roles:
-        - !Ref BedrockKBExecutionRole
-        - !Ref OpenSearchIndexLambdaRole
+      ServiceToken: !GetAtt AgentStackCreatorFunction.Arn
+      Agents: !GetAtt AgentDiscovery.Agents
+      StackConfiguration:
+        BedrockModelId: !Ref BedrockModelId
+        EnvironmentName: !Ref EnvironmentName
+        GitBranch: !Ref GitBranch
+        AgentRole: !GetAtt AgentRole.Arn
+        S3Bucket: !Ref S3Bucket
+        Region: !Ref AWS::Region
 
-  DataAccessPolicy:
-    Type: 'AWS::OpenSearchServerless::AccessPolicy'
+  # Lambda function to create agent stacks
+  AgentStackCreatorFunction:
+    Type: AWS::Lambda::Function
     Properties:
-      Name: !Sub '${EnvironmentName}-access-policy'
-            
-      Type: data
-      Description: !Sub 'Access policy for ${AWS::StackName} collection'
-      Policy: !Sub |
-        [
-          {
-            "Rules": [
-              {
-                "ResourceType": "collection",
-                "Resource": ["collection/${EnvironmentName}-${VectorStoreName}"],
-                "Permission": [
-                  "aoss:CreateCollectionItems",
-                  "aoss:DeleteCollectionItems",
-                  "aoss:UpdateCollectionItems",
-                  "aoss:DescribeCollectionItems"
-                ]
-              },
-              {
-                "ResourceType": "index",
-                "Resource": ["index/${EnvironmentName}-${VectorStoreName}/*"],
-                "Permission": [
-                  "aoss:CreateIndex",
-                  "aoss:DeleteIndex",
-                  "aoss:UpdateIndex",
-                  "aoss:DescribeIndex",
-                  "aoss:ReadDocument",
-                  "aoss:WriteDocument"
-                ]
-              }
-            ],
-            "Principal": [
-              "${BedrockKBExecutionRole.Arn}",
-              "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/bedrock.amazonaws.com/AWSServiceRoleForAmazonBedrock",
-              "${OpenSearchIndexLambdaRole.Arn}"
-            ],
-            "Description": "Data access policy for OpenSearch and Bedrock"
-          }
-        ]
-    DependsOn:
-      - Collection
-      - BedrockKBExecutionRole
-      - OpenSearchIndexLambdaRole
+      Runtime: python3.8
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          
+          def handler(event, context):
+            try:
+              if event['RequestType'] in ['Create', 'Update']:
+                cfn = boto3.client('cloudformation')
+                agents = event['ResourceProperties']['Agents']
+                config = event['ResourceProperties']['StackConfiguration']
+                
+                for agent in agents:
+                  stack_name = f"{config['EnvironmentName']}-{agent}"
+                  template_url = f"https://{config['S3Bucket']}.s3.{config['Region']}.amazonaws.com/packaged_{agent}.yaml"
+                  
+                  try:
+                    cfn.create_stack(
+                      StackName=stack_name,
+                      TemplateURL=template_url,
+                      Parameters=[
+                        {'ParameterKey': 'BedrockModelId', 'ParameterValue': config['BedrockModelId']},
+                        {'ParameterKey': 'EnvironmentName', 'ParameterValue': config['EnvironmentName']},
+                        {'ParameterKey': 'GitBranch', 'ParameterValue': config['GitBranch']},
+                        {'ParameterKey': 'AgentRole', 'ParameterValue': config['AgentRole']}
+                      ],
+                      TimeoutInMinutes=30
+                    )
+                  except cfn.exceptions.AlreadyExistsException:
+                    print(f"Stack {stack_name} already exists, updating...")
+                    cfn.update_stack(
+                      StackName=stack_name,
+                      TemplateURL=template_url,
+                      Parameters=[
+                        {'ParameterKey': 'BedrockModelId', 'ParameterValue': config['BedrockModelId']},
+                        {'ParameterKey': 'EnvironmentName', 'ParameterValue': config['EnvironmentName']},
+                        {'ParameterKey': 'GitBranch', 'ParameterValue': config['GitBranch']},
+                        {'ParameterKey': 'AgentRole', 'ParameterValue': config['AgentRole']}
+                      ]
+                    )
+                
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              else:
+                cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+            except Exception as e:
+              cfnresponse.send(event, context, cfnresponse.FAILED, {
+                'Error': str(e)
+              })
 
-  BedrockKnowledgeBase:
-    Type: AWS::Bedrock::KnowledgeBase
+  # Supervisor Agent (kept separate since it depends on other agents)
+  SupervisorAgent:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: AgentStacks
     Properties:
-      Name: !Sub '${AWS::StackName}-ncbiKnowledgebase'
-      Description: !Sub 'A knowledge base created using CloudFormation for ${AWS::StackName}'
-      KnowledgeBaseConfiguration:
-        Type: VECTOR
-        VectorKnowledgeBaseConfiguration:
-          EmbeddingModelArn: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.titan-embed-text-v1'
-      RoleArn: !GetAtt BedrockKBExecutionRole.Arn
-      StorageConfiguration:
-        Type: OPENSEARCH_SERVERLESS
-        OpensearchServerlessConfiguration:
-          CollectionArn: !GetAtt Collection.Arn
-          FieldMapping: 
-              VectorField: "bedrock-knowledge-base-default-vector"
-              TextField: "text"
-              MetadataField: "metadata"
-          VectorIndexName: !Ref IndexName
-    DependsOn: 
-      - DataAccessPolicy
-      - CreateOpenSearchIndex
-
-  KnowledgeBaseDataSource:
-    Type: AWS::Bedrock::DataSource
-    DependsOn:
-      - BedrockKnowledgeBase
-      - DataRetrievalLogic
-    Properties:
-      DataSourceConfiguration:
-        Type: S3
-        S3Configuration:
-          BucketArn: !GetAtt S3Bucket.Arn
-          InclusionPrefixes:
-            - "ncbi_article.pdf"
-      Description: !Sub 'Knowledge base Data Source for ${AWS::StackName} (NCBI article)'
-      KnowledgeBaseId: !Ref BedrockKnowledgeBase
-      Name: !Sub '${AWS::StackName}-ncbiKnowledgebaseds'
-      VectorIngestionConfiguration:
-        ChunkingConfiguration:
-          ChunkingStrategy: FIXED_SIZE
-          FixedSizeChunkingConfiguration:
-            MaxTokens: 300
-            OverlapPercentage: 20
+      TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_supervisor_agent.yaml
+      Parameters:
+        BedrockModelId: !Ref BedrockModelId
+        EnvironmentName: !Ref EnvironmentName
+        GitBranch: !Ref GitBranch
+      TimeoutInMinutes: 30

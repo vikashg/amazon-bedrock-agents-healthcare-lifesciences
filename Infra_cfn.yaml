@@ -1095,17 +1095,80 @@ Resources:
                 Resource:
                   - !Sub arn:aws:s3:::${S3Bucket}
                   - !Sub arn:aws:s3:::${S3Bucket}/*
-  
+  # AgentandUICodeBuild:
+  #   Type: AWS::CodeBuild::Project
+  #   Properties:
+  #     Name: !Sub ${AWS::StackName}-AgentandUIBuild
+  #     Description: "CodeBuild project to build agent CloudFormation templates"
+  #     ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+  #     Artifacts:
+  #       Type: S3
+  #       Location: !Ref S3Bucket
+  #       Name: packaged_agent_build.yaml
+  #       NamespaceType: NONE
+  #       Packaging: NONE
+  #     Environment:
+  #       Type: LINUX_CONTAINER
+  #       ComputeType: BUILD_GENERAL1_SMALL
+  #       Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+  #     Source:
+  #       Type: NO_SOURCE
+  #       BuildSpec: !Sub |
+  #         version: 0.2
+  #         phases:
+  #           install:
+  #             runtime-versions:
+  #               python: 3.8
+  #           pre_build:
+  #             commands:
+  #               - echo Cloning the repository
+  #               - git clone -b ${GitBranch} --single-branch ${GithubLink} repo
+  #               - cd repo
+  #           build:
+  #             commands:
+  #               - echo Packaging the CloudFormation templates
+  #               # Package main agent build template
+  #               - aws cloudformation package --template-file agent_build.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_agent_build.yaml
+                
+  #               # Package Subagents templates
+  #               - aws cloudformation package --template-file Subagents/Biomarker-database-analyst.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_biomarker_analyst.yaml
+  #               - aws cloudformation package --template-file Subagents/Clinical-evidence-researcher.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_clinical_researcher.yaml
+  #               - aws cloudformation package --template-file Subagents/Medical-imaging-expert.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_medical_imaging.yaml
+  #               - aws cloudformation package --template-file Subagents/Statistician.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_statistician.yaml
+                
+  #               # Package Supervisor agent template
+  #               - aws cloudformation package --template-file Supervisor\ agent/supervisor_agent.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_supervisor_agent.yaml
+                
+  #               # Package Streamlit UI template
+  #               - cd streamlitapp
+  #               - aws cloudformation package --template-file streamlit_build.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_streamlit_build.yaml
+                
+  #           post_build:
+  #             commands:
+  #               - echo Build completed on `date`
+  #               - echo Copying packaged templates to S3
+  #               # Copy all packaged templates to S3
+  #               - aws s3 cp packaged_streamlit_build.yaml s3://${S3Bucket}/packaged_streamlit_build.yaml
+  #               - cd ..
+  #               - aws s3 cp packaged_agent_build.yaml s3://${S3Bucket}/packaged_agent_build.yaml
+  #               - aws s3 cp packaged_biomarker_analyst.yaml s3://${S3Bucket}/packaged_biomarker_analyst.yaml
+  #               - aws s3 cp packaged_clinical_researcher.yaml s3://${S3Bucket}/packaged_clinical_researcher.yaml
+  #               - aws s3 cp packaged_medical_imaging.yaml s3://${S3Bucket}/packaged_medical_imaging.yaml
+  #               - aws s3 cp packaged_statistician.yaml s3://${S3Bucket}/packaged_statistician.yaml
+  #               - aws s3 cp packaged_supervisor_agent.yaml s3://${S3Bucket}/packaged_supervisor_agent.yaml
+  #     TimeoutInMinutes: 15
+
+
   AgentandUICodeBuild:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Sub ${AWS::StackName}-AgentandUIBuild
-      Description: "CodeBuild project to build the agent build CloudFormation template"
+      Description: "CodeBuild project to build and package agent CloudFormation templates"
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
       Artifacts:
         Type: S3
         Location: !Ref S3Bucket
-        Name: packaged_agent_build.yaml
+        Name: packaged_agents
         NamespaceType: NONE
         Packaging: NONE
       Environment:
@@ -1127,19 +1190,80 @@ Resources:
                 - cd repo
             build:
               commands:
-                - echo Packaging the CloudFormation template
-                - aws cloudformation package --template-file agent_build.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_agent_build.yaml
+                - echo Processing agent templates
+                - |
+                  for agent_file in agents/*.yaml; do
+                    if [ -f "$agent_file" ]; then
+                      agent_name=$(basename "$agent_file" .yaml)
+                      echo "Packaging agent: $agent_name"
+                      aws cloudformation package \
+                        --template-file "$agent_file" \
+                        --s3-bucket ${S3Bucket} \
+                        --output-template-file "packaged_${agent_name}.yaml"
+                    fi
+                  done
+                - echo Processing streamlit app
                 - cd streamlitapp
                 - aws cloudformation package --template-file streamlit_build.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_streamlit_build.yaml
-                - 
             post_build:
               commands:
                 - echo Build completed on `date`
-                - echo Copying packaged template to S3
-                - aws s3 cp packaged_streamlit_build.yaml s3://${S3Bucket}/packaged_streamlit_build.yaml
+                - echo Copying packaged templates to S3
                 - cd ..
-                - aws s3 cp packaged_agent_build.yaml s3://${S3Bucket}/packaged_agent_build.yaml
+                - |
+                  for packaged_file in packaged_*.yaml; do
+                    if [ -f "$packaged_file" ]; then
+                      echo "Copying $packaged_file to S3"
+                      aws s3 cp "$packaged_file" "s3://${S3Bucket}/$packaged_file"
+                    fi
+                  done
+                - cd streamlitapp
+                - aws s3 cp packaged_streamlit_build.yaml "s3://${S3Bucket}/packaged_streamlit_build.yaml"
       TimeoutInMinutes: 15
+  # AgentandUICodeBuild:
+  #   Type: AWS::CodeBuild::Project
+  #   Properties:
+  #     Name: !Sub ${AWS::StackName}-AgentandUIBuild
+  #     Description: "CodeBuild project to build the agent build CloudFormation template"
+  #     ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+  #     Artifacts:
+  #       Type: S3
+  #       Location: !Ref S3Bucket
+  #       Name: packaged_agent_build.yaml
+  #       NamespaceType: NONE
+  #       Packaging: NONE
+  #     Environment:
+  #       Type: LINUX_CONTAINER
+  #       ComputeType: BUILD_GENERAL1_SMALL
+  #       Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+  #     Source:
+  #       Type: NO_SOURCE
+  #       BuildSpec: !Sub |
+  #         version: 0.2
+  #         phases:
+  #           install:
+  #             runtime-versions:
+  #               python: 3.8
+  #           pre_build:
+  #             commands:
+  #               - echo Cloning the repository
+  #               - git clone -b ${GitBranch} --single-branch ${GithubLink} repo
+  #               - cd repo
+  #           build:
+  #             commands:
+  #               - echo Packaging the CloudFormation template
+  #               - aws cloudformation package --template-file agent_build.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_agent_build.yaml
+  #               - cd streamlitapp
+  #               - aws cloudformation package --template-file streamlit_build.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_streamlit_build.yaml
+  #               - 
+  #           post_build:
+  #             commands:
+  #               - echo Build completed on `date`
+  #               - echo Copying packaged template to S3
+  #               - aws s3 cp packaged_streamlit_build.yaml s3://${S3Bucket}/packaged_streamlit_build.yaml
+  #               - cd ..
+  #               - aws s3 cp packaged_agent_build.yaml s3://${S3Bucket}/packaged_agent_build.yaml
+  #     TimeoutInMinutes: 15
 
   AgentBuildNestedStack:
     Type: AWS::CloudFormation::Stack
