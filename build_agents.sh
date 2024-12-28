@@ -24,7 +24,7 @@ done
 cd ..
 
 # Process Supervisor agent template - note the quotes around directory name
-cd "Supervisor agent" || exit
+cd "SupervisorAgent" || exit
 echo "Processing supervisor agent template..."
 if [ -f "supervisor_agent.yaml" ]; then
   echo "Packaging supervisor agent"
