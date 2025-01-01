@@ -1127,7 +1127,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: '2012-10-01'
+        Version: "2012-10-17"
         Statement:
           - Effect: Allow
             Principal:
@@ -1138,7 +1138,7 @@ Resources:
       Policies:
         - PolicyName: AgentManagementPolicy
           PolicyDocument:
-            Version: '2012-10-01'
+            Version: "2012-10-17"
             Statement:
               - Effect: Allow
                 Action:
@@ -1153,6 +1153,10 @@ Resources:
                   - cloudformation:UpdateStack
                   - cloudformation:DeleteStack
                   - cloudformation:DescribeStacks
+                  - cloudformation:ListStacks
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
                 Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${EnvironmentName}-*/*
 
   
