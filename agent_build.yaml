@@ -214,6 +214,16 @@ Resources:
             Condition:
               Bool:
                 'aws:SecureTransport': false
+          - Sid: AllowCloudFormationAccess
+            Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Sub '${S3Bucket.Arn}'
+              - !Sub '${S3Bucket.Arn}/*'
 
   LogBucket:
     Type: AWS::S3::Bucket
