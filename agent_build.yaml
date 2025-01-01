@@ -1044,7 +1044,7 @@ Resources:
                   - bedrock:Retrieve
                 Resource: 
                   - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModelId}
-                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${BedrockKnowledgeBase}
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*
   
 
 
