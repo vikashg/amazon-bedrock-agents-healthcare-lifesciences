@@ -1222,6 +1222,7 @@ Resources:
     DependsOn: TriggerDataRetrievalLogic
     Properties:
       ServiceToken: !GetAtt AgentStackCreatorFunction.Arn
+      CloudFormationRoleArn: !GetAtt CloudFormationServiceRole.Arn
       Agents: !GetAtt AgentDiscovery.Agents
       StackConfiguration:
         BedrockModelId: !Ref BedrockModelId
@@ -1249,6 +1250,7 @@ Resources:
                 cfn = boto3.client('cloudformation')
                 agents = event['ResourceProperties']['Agents']
                 config = event['ResourceProperties']['StackConfiguration']
+                cfn_role_arn = event['ResourceProperties']['CloudFormationRoleArn']
                 
                 for agent in agents:
                   stack_name = f"{config['EnvironmentName']}-{agent}"
@@ -1258,6 +1260,7 @@ Resources:
                     cfn.create_stack(
                       StackName=stack_name,
                       TemplateURL=template_url,
+                      RoleARN=cfn_role_arn,  # Add this line
                       Parameters=[
                         {'ParameterKey': 'BedrockModelId', 'ParameterValue': config['BedrockModelId']},
                         {'ParameterKey': 'EnvironmentName', 'ParameterValue': config['EnvironmentName']},
@@ -1271,6 +1274,7 @@ Resources:
                     cfn.update_stack(
                       StackName=stack_name,
                       TemplateURL=template_url,
+                      RoleARN=cfn_role_arn,  # Add this line
                       Parameters=[
                         {'ParameterKey': 'BedrockModelId', 'ParameterValue': config['BedrockModelId']},
                         {'ParameterKey': 'EnvironmentName', 'ParameterValue': config['EnvironmentName']},
@@ -1287,12 +1291,36 @@ Resources:
                 'Error': str(e)
               })
 
+  CloudFormationServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3TemplateAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource: 
+                  - !Sub 'arn:aws:s3:::${S3Bucket}'
+                  - !Sub 'arn:aws:s3:::${S3Bucket}/*'
+
   # Supervisor Agent (kept separate since it depends on other agents)
   SupervisorAgent:
     Type: AWS::CloudFormation::Stack
     DependsOn: AgentStacks
     Properties:
       TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_supervisor_agent.yaml
+      RoleARN: !GetAtt CloudFormationServiceRole.Arn  
       Parameters:
         BedrockModelId: !Ref BedrockModelId
         EnvironmentName: !Ref EnvironmentName

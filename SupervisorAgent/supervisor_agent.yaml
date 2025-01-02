@@ -36,6 +36,7 @@ Resources:
                 Action:
                   - bedrock:GetAgentAlias
                   - bedrock:InvokeAgent
+                  - bedrock:DeleteAgent
                 Resource:
                   - arn:aws:bedrock:*:*:agent/*
                   - arn:aws:bedrock:*:*:agent-alias/*
