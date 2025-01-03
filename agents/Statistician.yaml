@@ -10,8 +10,7 @@ Parameters:
   S3Bucket:
     Type: String
     Description: The S3 bucket containing the lambda function for the agent
-    Default: '${EnvironmentName}-${AWS::AccountId}-${AWS::Region}-agent-build-bucket'
-
+    
   BedrockModelId:
     Type: String
     Description: The ID of the Foundation Model to use for the Agent
@@ -19,7 +18,6 @@ Parameters:
   AgentRole:
     Type: String
     Description: The arn for the agent 
-    Default: !Sub arn:aws:iam::${AWS::AccountId}:role/service-role/AmazonBedrockExecutionRoleForAgents_${AWS::AccountId}
 
 Resources:
   StatisticianAgentResource:
