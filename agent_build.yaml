@@ -1278,6 +1278,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
+      Timeout: 300
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
@@ -1307,6 +1308,7 @@ Resources:
                         {'ParameterKey': 'AgentRole', 'ParameterValue': config['AgentRole']},
                         {'ParameterKey': 'S3Bucket', 'ParameterValue': config['AgentS3Bucket']}
                       ],
+                      Capabilities=['CAPABILITY_IAM'] 
                       TimeoutInMinutes=30
                     )
                   except cfn.exceptions.AlreadyExistsException:
@@ -1319,7 +1321,8 @@ Resources:
                         {'ParameterKey': 'EnvironmentName', 'ParameterValue': config['EnvironmentName']},
                         {'ParameterKey': 'AgentRole', 'ParameterValue': config['AgentRole']},
                         {'ParameterKey': 'S3Bucket', 'ParameterValue': config['AgentS3Bucket']}
-                      ]
+                      ],
+                      Capabilities=['CAPABILITY_IAM'] 
                     )
                 
                 cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
