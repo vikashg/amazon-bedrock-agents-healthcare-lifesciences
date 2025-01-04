@@ -1304,7 +1304,6 @@ Resources:
                       Parameters=[
                         {'ParameterKey': 'BedrockModelId', 'ParameterValue': config['BedrockModelId']},
                         {'ParameterKey': 'EnvironmentName', 'ParameterValue': config['EnvironmentName']},
-                        {'ParameterKey': 'GitBranch', 'ParameterValue': config['GitBranch']},
                         {'ParameterKey': 'AgentRole', 'ParameterValue': config['AgentRole']},
                         {'ParameterKey': 'S3Bucket', 'ParameterValue': config['AgentS3Bucket']}
                       ],
@@ -1318,7 +1317,6 @@ Resources:
                       Parameters=[
                         {'ParameterKey': 'BedrockModelId', 'ParameterValue': config['BedrockModelId']},
                         {'ParameterKey': 'EnvironmentName', 'ParameterValue': config['EnvironmentName']},
-                        {'ParameterKey': 'GitBranch', 'ParameterValue': config['GitBranch']},
                         {'ParameterKey': 'AgentRole', 'ParameterValue': config['AgentRole']},
                         {'ParameterKey': 'S3Bucket', 'ParameterValue': config['AgentS3Bucket']}
                       ]
