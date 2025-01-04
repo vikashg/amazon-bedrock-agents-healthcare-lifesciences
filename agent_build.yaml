@@ -1308,7 +1308,7 @@ Resources:
                         {'ParameterKey': 'AgentRole', 'ParameterValue': config['AgentRole']},
                         {'ParameterKey': 'S3Bucket', 'ParameterValue': config['AgentS3Bucket']}
                       ],
-                      Capabilities=['CAPABILITY_IAM'] 
+                      Capabilities=['CAPABILITY_IAM'],
                       TimeoutInMinutes=30
                     )
                   except cfn.exceptions.AlreadyExistsException:
