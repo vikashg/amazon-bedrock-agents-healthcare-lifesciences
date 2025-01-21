@@ -2,13 +2,13 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: 'CloudFormation template for Bedrock Agent deployment using custom resource'
 
 Parameters:
-  # LayerBucket:
-  #   Type: String
-  #   Description: S3 bucket containing the Lambda layer zip file
   EnvironmentName:
     Type: String
     Description: The unique EnvironmentName for the application
     Default: env1
+  S3Bucket:
+    Type: String
+    Description: The S3 bucket containing the lambda function for the agent
 
 Resources:
   BedrockAgentRole:
@@ -41,16 +41,16 @@ Resources:
                   - arn:aws:bedrock:*:*:agent/*
                   - arn:aws:bedrock:*:*:agent-alias/*
 
-  # LambdaLayer:
-  #   Type: AWS::Lambda::LayerVersion
-  #   Properties:
-  #     CompatibleRuntimes:
-  #       - python3.9
-  #     Content:
-  #       S3Bucket: !Ref LayerBucket
-  #       S3Key: boto3-layer.zip
-  #     Description: Layer containing boto3 and cfnresponse
-  #     LayerName: BedrockAgentDependencies
+  LambdaLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+        - python3.12
+      Content:
+        S3Bucket: !Ref S3Bucket
+        S3Key: lambda-layer.zip
+      Description: Layer containing latest boto3
+      LayerName: BedrockAgentDependencies
 
   CollaboratorLambdaRole:
     Type: AWS::IAM::Role
@@ -64,52 +64,58 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
-
-  LambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: BedrockAgentAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - bedrock:CreateAgent
-                  - bedrock:DeleteAgent
-                Resource: '*'
-              - Effect: Allow
-                Action: iam:PassRole
-                Resource: !GetAtt BedrockAgentRole.Arn
+      - PolicyName: BedrockAgentAccess
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - bedrock:*
+            Resource: 
+            - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*'
+            - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*'
+          - Effect: Allow
+            Action: iam:PassRole
+            Resource:
+              Fn::GetAtt:
+              - BedrockAgentRole
+              - Arn
 
   BedrockAgentFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Runtime: python3.9
+      Runtime: python3.12
       Handler: index.handler
-      Role: !GetAtt LambdaExecutionRole.Arn
-      # Layers:
-      #   - !Ref LambdaLayer
+      Role: !GetAtt CollaboratorLambdaRole.Arn
+      Layers:
+        - !Ref LambdaLayer
       Code:
         ZipFile: |
           import boto3
           import cfnresponse
           import uuid
+          import time
 
+          client = boto3.client('bedrock-agent')
+
+          def delete_agent_aliases(client, agent_id):
+              try:
+                  # List all aliases for the agent
+                  aliases = client.list_agent_aliases(agentId=agent_id)
+                  
+                  # Delete each alias
+                  for alias in aliases['agentAliasSummaries']:
+                      client.delete_agent_alias(agentId=agent_id, agentAliasId=alias['agentAliasId'])
+                  
+                  print(f"All aliases for agent {agent_id} have been deleted.")
+              except Exception as e:
+                  print(f"Error deleting aliases: {str(e)}")
+                  raise
           def handler(event, context):
               try:
                   if event['RequestType'] in ['Create', 'Update']:
-                      client = boto3.client('bedrock-agent')
+                      
                       response = client.create_agent(
                           agentName='Supervisoragent',
                           agentResourceRoleArn=event['ResourceProperties']['RoleArn'],
@@ -130,9 +136,22 @@ Resources:
                           {'AgentId': physical_id}, physical_id)
                   elif event['RequestType'] == 'Delete':
                       if 'PhysicalResourceId' in event:
-                          client = boto3.client('bedrock-agent')
-                          client.delete_agent(agentId=event['PhysicalResourceId'])
-                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                          agent_id = event['PhysicalResourceId']
+                          try:
+                              # First, attempt to delete aliases
+                              delete_agent_aliases(client, agent_id)
+                              
+                              # Then, attempt to delete the agent
+                              client.delete_agent(agentId=agent_id)
+                          except client.exceptions.ConflictException as ce:
+                              print(f"ConflictException: {str(ce)}")
+                              # If we still get a ConflictException, we can't resolve it automatically
+                              cfnresponse.send(event, context, cfnresponse.FAILED, 
+                                  {'Error': f"Unable to delete agent {agent_id}. Please check and remove any remaining dependencies manually."})
+                              return
+                  #sleeping to allow time for agent build 
+                  time.sleep(15)
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
               except Exception as e:
                   print(f"Error: {str(e)}")
                   cfnresponse.send(event, context, cfnresponse.FAILED, 
@@ -148,13 +167,13 @@ Resources:
   CollaboratorAssociationFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Runtime: python3.9
+      Runtime: python3.12
+      Layers:
+        - !Ref LambdaLayer
       Handler: index.handler
       Role: !GetAtt CollaboratorLambdaRole.Arn
-      # Layers:
-      #   - !Ref LambdaLayer
       Code:
-        ZipFile: |
+        ZipFile: !Sub |
           import boto3
           import cfnresponse
           import time
@@ -168,43 +187,53 @@ Resources:
                       # Define sub-agents with their configurations
                       sub_agents = [
                           {
-                              "sub_agent_association_name": "Medical-imaging-expert",
+                              "sub_agent_association_name": "Medical-Imaging-Expert-${EnvironmentName}",
                               "sub_agent_instruction": "You are the medical imaging expert. Analyze and interpret medical images.",
                               "relay_conversation_history": "TO_COLLABORATOR"
                           },
                           {
-                              "sub_agent_association_name": "Clinical-evidence-researcher",
+                              "sub_agent_association_name": "Clinical-evidence-researcher-${EnvironmentName}",
                               "sub_agent_instruction": "You are the clinical evidence researcher. Review and analyze clinical evidence.",
                               "relay_conversation_history": "TO_COLLABORATOR"
                           },
                           {
-                              "sub_agent_association_name": "Statistician",
+                              "sub_agent_association_name": "Statistician-agent-${EnvironmentName}",
                               "sub_agent_instruction": "You are the statistician. Provide statistical analysis and interpretation.",
                               "relay_conversation_history": "TO_COLLABORATOR"
                           },
                           {
-                              "sub_agent_association_name": "Clinical-trial-analyst",
+                              "sub_agent_association_name": "biomarker-database-analyst-${EnvironmentName}",
                               "sub_agent_instruction": "You are the clinical trial analyst. Analyze trial data and outcomes.",
                               "relay_conversation_history": "TO_COLLABORATOR"
                           }
                       ]
-
                       # Get all target agents to build alias ARNs
                       response = client.list_agents(maxResults=100)
                       agent_map = {}
                       
+                      #Get each agent alias
                       for agent in response['agentSummaries']:
                           if agent['agentName'] in [sa["sub_agent_association_name"] for sa in sub_agents]:
-                              # Get existing alias
+                          
                               alias_response = client.list_agent_aliases(
-                                  agentId=agent['agentId'],
-                                  maxResults=1
+                                  agentId=agent['agentId']
                               )
-                              alias_id = alias_response['agentAliasSummaries'][0]['agentAliasId']
-                              
-                              # Construct the alias ARN
-                              alias_arn = f"arn:aws:bedrock:{context.invoked_function_arn.split(':')[3]}:{context.invoked_function_arn.split(':')[4]}:agent-alias/{agent['agentId']}/{alias_id}"
-                              agent_map[agent['agentName']] = alias_arn
+                              sorted_aliases = sorted(
+                                  alias_response['agentAliasSummaries'],
+                                  key=lambda x: x['createdAt'],
+                                  reverse=True
+                              )
+                              alias_id = next(
+                                  (alias['agentAliasId'] for alias in sorted_aliases if alias['agentAliasId'] != 'TSTALIASID'),
+                                  None
+                              )
+                              if alias_id:
+                                  print(f"Selected alias ID: {alias_id}")
+                        
+                                  alias_arn = f"arn:aws:bedrock:{context.invoked_function_arn.split(':')[3]}:{context.invoked_function_arn.split(':')[4]}:agent-alias/{agent['agentId']}/{alias_id}"
+                                  agent_map[agent['agentName']] = alias_arn
+                              else:
+                                  print(f"No suitable alias found for agent {agent['agentName']}")
 
                       # Associate sub-agents
                       for sub_agent in sub_agents:
@@ -250,6 +279,7 @@ Resources:
       AgentId: !GetAtt BedrockAgentCustomResource.AgentId
   
   AgentIdSSMParameter:
+    DependsOn: CollaboratorAssociationCustomResource
     Type: AWS::SSM::Parameter
     Properties:
       Name: !Sub /streamlitapp/${EnvironmentName}/AGENT_ID

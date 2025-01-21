@@ -18,7 +18,15 @@ Parameters:
   
   AgentRole:
     Type: String
-    Description: The arn for the agent 
+    Description: The arn for the agent
+  
+  ImagingStateMachineName:
+    Type: String
+    Description: Name of the State Machine
+  
+  ImagingStateMachineArn:
+    Type: String
+    Description: ARN of the State Machine
 
 
 Mappings:
@@ -92,7 +100,7 @@ Resources:
       MemorySize: 256
       Environment:
         Variables:
-          SFN_STATEMACHINE_NAME: !GetAtt ImagingStateMachine.Name
+          SFN_STATEMACHINE_NAME: !Ref ImagingStateMachineName
           REGION: !Sub ${AWS::Region}
           ACCOUNTID: !Sub ${AWS::AccountId}
           S3BUCKET: !Sub s3://${S3Bucket}
@@ -131,8 +139,13 @@ Resources:
                   - !Sub arn:aws:s3:::${S3Bucket}/*
               - Effect: Allow
                 Action:
+                  - kms:RetireGrant
+                Resource:
+                  - !Sub arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*
+              - Effect: Allow
+                Action:
                   - states:StartExecution
-                Resource: !Ref ImagingStateMachine
+                Resource: !Ref ImagingStateMachineArn
     
   ImagingLambdaPermission:
     Type: AWS::Lambda::Permission

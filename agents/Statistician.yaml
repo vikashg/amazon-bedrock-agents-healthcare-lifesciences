@@ -18,14 +18,21 @@ Parameters:
   AgentRole:
     Type: String
     Description: The arn for the agent 
+  ImageTag:
+    Type: String
+    Default: latest
+    Description: Tag for the Docker image
+  ECRRepository:
+    Type: String
+    Default: lifelines-lambda-sample
+    Description: ECR repository name
 
 Resources:
   StatisticianAgentResource:
     Type: AWS::Bedrock::Agent
-    DependsOn:
     Properties:
       AgentName: !Sub Statistician-agent-${EnvironmentName}
-      StatisticanAgentResourceRoleArn: !Ref AgentRole
+      AgentResourceRoleArn: !Ref AgentRole
       AutoPrepare : True
       FoundationModel: !Ref BedrockModelId
       Instruction: |
@@ -157,12 +164,11 @@ Resources:
         S3Bucket: !Ref S3Bucket
         S3Key: lambda-layer.zip
       CompatibleRuntimes:
-        - python3.11
+        - python3.12
     
 
   MatPlotBarChartLambdaFunction:
     Type: AWS::Lambda::Function
-    DependsOn: ImagingBiomarkerLambda
     Properties:
       FunctionName: MatPlotBarChartLambda
       Handler: matplotbarchartlambda.handler  
@@ -211,6 +217,21 @@ Resources:
                   - s3:PutObject
                   - s3:GetObject
                 Resource: !Sub 'arn:aws:s3:::${S3Bucket}/*'
+        - PolicyName: ECRAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchCheckLayerAvailability
+                Resource:
+                  - !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${ECRRepository}'
 
   ScientificPlotLambdaFunction:
     Type: AWS::Lambda::Function
