@@ -72,6 +72,7 @@ Resources:
           - Effect: Allow
             Action:
             - bedrock:*
+            - bedrock:ListAgentAliases
             Resource: 
             - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*'
             - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*'
@@ -92,10 +93,15 @@ Resources:
         - !Ref LambdaLayer
       Code:
         ZipFile: |
-          import boto3
           import cfnresponse
           import uuid
           import time
+          import sys
+          from pip._internal import main
+          main(['install', '-I', '-q', 'boto3', '--target', '/tmp/', '--no-cache-dir', '--disable-pip-version-check'])
+          sys.path.insert(0,'/tmp/')
+          import boto3
+          from botocore.exceptions import ClientError
 
           client = boto3.client('bedrock-agent')
 

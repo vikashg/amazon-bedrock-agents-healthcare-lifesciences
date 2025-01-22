@@ -13,6 +13,12 @@ Parameters:
     MaxLength: 5
     AllowedPattern: ^[a-z]{1,4}[0-9]$
     ConstraintDescription: Must be lowercase, contain one number at the end, and be no more than 5 characters long.
+  MultiAgentDevMode:
+    Type: String
+    Description: Select True to use a python notebook to manually create the agents step by step. Select false to auto create all agents. 
+    AllowedValues: 
+     - True
+     - False
   GitRepoURL:
     Type: String
     Default: 'https://github.com/aws-samples/amazon-bedrock-agents-cancer-biomarker-discovery.git'
@@ -31,8 +37,11 @@ Parameters:
     Description: Name of the vector index to be created
   GitBranch:
     Type: String
-    Description: 'The github branch to clone, change only for dev testing'
-    Default: 'main'
+    Description: The github branch to clone
+    Default: main
+    AllowedValues:
+      - main
+      - multi-agent-collaboration
   SubAgentS3Bucket:
     Type: String
     Description: 'The S3 bucket containing the Subagents'
@@ -284,6 +293,7 @@ Resources:
               commands:
                 - echo "downloading Ncbi article for KB ingestion"
                 - yum install -y wget
+                - python -m pip install --upgrade pip
                
             build:
               commands:
@@ -1059,7 +1069,6 @@ Resources:
                 Resource: 
                   - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModelId}
                   - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*
-  
 
 
   S3BucketNameSSMParameter:
@@ -1069,109 +1078,6 @@ Resources:
       Type: String
       Value: !Ref S3Bucket
       Description: !Sub SSM parameter for S3 bucket name for ${EnvironmentName}
-
-#Supervisor Agent
-  # SupervisorAgent:
-  #   Type: AWS::CloudFormation::Stack
-  #   DependsOn: 
-  #     - BiomarkerAnalyst
-  #     - Statistician
-  #     - MedicalImagingAgent
-  #     - ClinicalEvidence
-  #   Properties:
-  #     TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_agent_build.yaml
-  #     Parameters:
-  #       BedrockModelId: !Ref BedrockModelId
-  #       EnvironmentName: !Ref EnvironmentName
-  #       GitBranch: !Ref GitBranch
-  #     TimeoutInMinutes: 30
-
-
-
-# Subagents 
-  # BiomarkerAnalyst:
-  #   Type: AWS::CloudFormation::Stack
-  #   DependsOn: TriggerDataRetrievalLogic
-  #   Properties:
-  #     TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_agent_build.yaml
-  #     Parameters:
-  #       BedrockModelId: !Ref BedrockModelId
-  #       EnvironmentName: !Ref EnvironmentName
-  #       GitBranch: !Ref GitBranch
-  #       AgentRole: !GetAtt AgentRole.Arn
-  #     TimeoutInMinutes: 30
-  
-  # Statistician:
-  #   Type: AWS::CloudFormation::Stack
-  #   DependsOn: EnsureECRImagePushed
-  #   Properties:
-  #     TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_agent_build.yaml
-  #     Parameters:
-  #       BedrockModelId: !Ref BedrockModelId
-  #       EnvironmentName: !Ref EnvironmentName
-  #       GitBranch: !Ref GitBranch
-  #       AgentRole: !GetAtt AgentRole.Arn
-  #     TimeoutInMinutes: 30
-  
-  # MedicalImagingAgent:
-  #   Type: AWS::CloudFormation::Stack
-  #   DependsOn: EnsureECRImagePushed
-  #   Properties:
-  #     TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_agent_build.yaml
-  #     Parameters:
-  #       BedrockModelId: !Ref BedrockModelId
-  #       EnvironmentName: !Ref EnvironmentName
-  #       GitBranch: !Ref GitBranch
-  #       AgentRole: !GetAtt AgentRole.Arn
-  #     TimeoutInMinutes: 30
-  
-  # ClinicalEvidence:
-  #   Type: AWS::CloudFormation::Stack
-  #   DependsOn: 
-  #     - TriggerDataRetrievalLogic
-  #   Properties:
-  #     TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_agent_build.yaml
-  #     Parameters:
-  #       BedrockModelId: !Ref BedrockModelId
-  #       EnvironmentName: !Ref EnvironmentName
-  #       GitBranch: !Ref GitBranch
-  #       AgentRole: !GetAtt AgentRole.Arn
-  #     TimeoutInMinutes: 30
-  # LambdaExecutionRole:
-  #   Type: AWS::IAM::Role
-  #   Properties:
-  #     AssumeRolePolicyDocument:
-  #       Version: "2012-10-17"
-  #       Statement:
-  #         - Effect: Allow
-  #           Principal:
-  #             Service: lambda.amazonaws.com
-  #           Action: sts:AssumeRole
-  #     ManagedPolicyArns:
-  #       - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-  #     Policies:
-  #       - PolicyName: AgentManagementPolicy
-  #         PolicyDocument:
-  #           Version: "2012-10-17"
-  #           Statement:
-  #             - Effect: Allow
-  #               Action:
-  #                 - s3:ListBucket
-  #                 - s3:GetObject
-  #               Resource: 
-  #                 - !Sub arn:aws:s3:::${S3Bucket}
-  #                 - !Sub arn:aws:s3:::${S3Bucket}/*
-  #             - Effect: Allow
-  #               Action:
-  #                 - cloudformation:CreateStack
-  #                 - cloudformation:UpdateStack
-  #                 - cloudformation:DeleteStack
-  #                 - cloudformation:DescribeStacks
-  #                 - cloudformation:ListStacks
-  #                 - cloudformation:GetTemplateSummary
-  #                 - cloudformation:DescribeStackEvents
-  #                 - cloudformation:DescribeStackResources
-  #               Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${EnvironmentName}-*/*
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -1194,9 +1100,13 @@ Resources:
                 Action:
                   - s3:ListBucket
                   - s3:GetObject
+                  - s3:PutObject
                 Resource: 
                   - !Sub arn:aws:s3:::${SubAgentS3Bucket}
                   - !Sub arn:aws:s3:::${SubAgentS3Bucket}/*
+                  - !Sub arn:aws:s3:::${S3Bucket}
+                  - !Sub arn:aws:s3:::${S3Bucket}/*
+      
               - Effect: Allow
                 Action:
                   - cloudformation:CreateStack
@@ -1207,8 +1117,106 @@ Resources:
                   - cloudformation:GetTemplateSummary
                   - cloudformation:DescribeStackEvents
                   - cloudformation:DescribeStackResources
-                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${EnvironmentName}-*/*
-
+                  - cloudformation:TagResource
+                  - cloudformation:UntagResource
+                  - aoss:*
+                Resource: 
+                  - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${EnvironmentName}-*/*
+                  - "*"
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:PutRolePolicy
+                  - iam:AttachRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:GetRole
+                  - iam:DeleteRole
+                  - iam:DetachRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:DeletePolicy
+                  - iam:UpdateRole
+                  - iam:UpdateRoleDescription
+                  - iam:GetRolePolicy
+                  - iam:PassRole
+                  - iam:CreatePolicy
+                  - iam:GetPolicy
+                  - iam:ListPolicyVersions
+                Resource: 
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/${EnvironmentName}-*
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/ImagingBiomarkerLambdaExecutionRole-*
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/*-AgentLambdaRole-*
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/AgentLambdaRole-*
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/*
+                  - !Sub arn:aws:iam::${AWS::AccountId}:policy/${EnvironmentName}-*
+                  - !Sub arn:aws:iam::${AWS::AccountId}:policy/Clinical-evidence-researcher-*
+              - Effect: Allow
+                Action:
+                  - lambda:GetFunction
+                  - lambda:CreateFunction
+                  - lambda:DeleteFunction
+                  - lambda:UpdateFunctionCode
+                  - lambda:UpdateFunctionConfiguration
+                  - lambda:AddPermission
+                  - lambda:RemovePermission
+                  - lambda:GetPolicy
+                  - lambda:GetLayerVersion
+                  - lambda:InvokeFunction
+                  - lambda:PublishLayerVersion
+                  - lambda:DeleteLayerVersion
+                Resource:
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*-${EnvironmentName}
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:imaging-biomarker-lambda
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:ScientificPlotLambda
+                  - !Sub arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python312:12
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:biomarker-agent-*
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:layer:matplotliblayer
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:layer:matplotliblayer:*
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:MatPlotBarChartLambda
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:PubMedQueryFunction
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*-Clinical-evidence-*-OpenSearchIndexLambda-*
+              - Effect: Allow
+                Action:
+                  - bedrock:*
+                Resource:
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:*
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*/action-group/*
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                  - ecr:GetRepositoryPolicy
+                  - ecr:DescribeRepositories
+                  - ecr:ListImages
+                  - ecr:DescribeImages
+                  - ecr:BatchGetImage
+                  - ecr:GetLifecyclePolicy
+                  - ecr:GetLifecyclePolicyPreview
+                  - ecr:ListTagsForResource
+                  - ecr:DescribeImageScanFindings
+                  - ecr:GetAuthorizationToken
+                  - ecr:SetRepositoryPolicy  
+                Resource:
+                  - !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/*
+                  - !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/medical-image-processing-smstudio
+      
   
   AgentDiscoveryFunction:
     Type: AWS::Lambda::Function
@@ -1272,75 +1280,209 @@ Resources:
         SourceS3Bucket: !Ref SubAgentS3Bucket
         Region: !Ref AWS::Region
         AgentS3Bucket: !Ref S3Bucket
+        ImagingStateMachineName: !GetAtt ImagingStateMachine.Name
+        ImagingStateMachineArn: !Ref ImagingStateMachine
+      VectorStoreName: !Ref VectorStoreName
+      MultiAgentDevModeStatus: !Ref MultiAgentDevMode
 
-  # Lambda function to create agent stacks
   AgentStackCreatorFunction:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
-      Timeout: 300
+      Timeout: 900
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
         ZipFile: |
           import boto3
           import cfnresponse
-          
+          import time
+
           def handler(event, context):
-            try:
-              if event['RequestType'] in ['Create', 'Update']:
-                cfn = boto3.client('cloudformation')
-                agents = event['ResourceProperties']['Agents']
-                config = event['ResourceProperties']['StackConfiguration']
-                
-                
-                for agent in agents:
-                  stack_name = f"{config['EnvironmentName']}-{agent}"
-                  template_url = f"https://{config['SourceS3Bucket']}.s3.{config['Region']}.amazonaws.com/packaged_{agent}.yaml"
-                  
-                  try:
-                    cfn.create_stack(
-                      StackName=stack_name,
-                      TemplateURL=template_url,
-                      Parameters=[
-                        {'ParameterKey': 'BedrockModelId', 'ParameterValue': config['BedrockModelId']},
-                        {'ParameterKey': 'EnvironmentName', 'ParameterValue': config['EnvironmentName']},
-                        {'ParameterKey': 'AgentRole', 'ParameterValue': config['AgentRole']},
-                        {'ParameterKey': 'S3Bucket', 'ParameterValue': config['AgentS3Bucket']}
-                      ],
-                      Capabilities=['CAPABILITY_IAM'],
-                      TimeoutInMinutes=30
-                    )
-                  except cfn.exceptions.AlreadyExistsException:
-                    print(f"Stack {stack_name} already exists, updating...")
-                    cfn.update_stack(
-                      StackName=stack_name,
-                      TemplateURL=template_url,
-                      Parameters=[
-                        {'ParameterKey': 'BedrockModelId', 'ParameterValue': config['BedrockModelId']},
-                        {'ParameterKey': 'EnvironmentName', 'ParameterValue': config['EnvironmentName']},
-                        {'ParameterKey': 'AgentRole', 'ParameterValue': config['AgentRole']},
-                        {'ParameterKey': 'S3Bucket', 'ParameterValue': config['AgentS3Bucket']}
-                      ],
-                      Capabilities=['CAPABILITY_IAM'] 
-                    )
-                
-                cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-              else:
-                cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-            except Exception as e:
-              cfnresponse.send(event, context, cfnresponse.FAILED, {
-                'Error': str(e)
-              })
+              try:
+                  cfn = boto3.client('cloudformation')
+                  agents = event['ResourceProperties']['Agents']
+                  config = event['ResourceProperties']['StackConfiguration']
+
+                  if event['RequestType'] == 'Delete':
+                      print(f"Delete request received, deleting {len(agents)} stacks")
+                      
+                      deleted_stacks = []
+                      
+                      for agent in agents:
+                          stack_name = f"{config['EnvironmentName']}-{agent}"
+                          try:
+                              cfn.describe_stacks(StackName=stack_name)
+                              print(f"Deleting stack: {stack_name}")
+                              cfn.delete_stack(StackName=stack_name)
+                              deleted_stacks.append(stack_name)
+                          except cfn.exceptions.ClientError as e:
+                              if 'does not exist' in str(e):
+                                  print(f"Stack {stack_name} does not exist, skipping deletion")
+                                  continue
+                              else:
+                                  raise e
+
+                      timeout = time.time() + 900  # 15 minutes
+                      while deleted_stacks and time.time() < timeout:
+                          for stack_name in deleted_stacks[:]:
+                              try:
+                                  status = cfn.describe_stacks(StackName=stack_name)['Stacks'][0]['StackStatus']
+                                  if status == 'DELETE_COMPLETE':
+                                      deleted_stacks.remove(stack_name)
+                                      print(f"Stack {stack_name} deleted successfully")
+                                  elif status.endswith('FAILED'):
+                                      raise Exception(f"Stack {stack_name} deletion failed with status: {status}")
+                              except cfn.exceptions.ClientError as e:
+                                  if 'does not exist' in str(e):
+                                      deleted_stacks.remove(stack_name)
+                                      print(f"Stack {stack_name} deleted successfully")
+                          
+                          if deleted_stacks:
+                              time.sleep(10)
+
+                      if deleted_stacks:
+                          raise Exception(f"Timeout waiting for stacks to delete: {deleted_stacks}")
+                      
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      
+                  elif event['RequestType'] in ['Create', 'Update']:
+                      MultiAgentDevModeStatus = event['ResourceProperties']['MultiAgentDevModeStatus']
+                      if MultiAgentDevModeStatus == "false":
+
+                        # Track stacks being created/updated
+                        pending_stacks = []
+                        
+                        for agent in agents:
+                            stack_name = f"{config['EnvironmentName']}-{agent}"
+                            print(f"Processing stack: {stack_name}")
+                            template_url = f"https://{config['SourceS3Bucket']}.s3.{config['Region']}.amazonaws.com/packaged_{agent}.yaml"
+
+                            print(f"Using template URL: {template_url}")
+                            
+                            try:
+                                base_params = [
+                                    {'ParameterKey': 'BedrockModelId', 'ParameterValue': config['BedrockModelId']},
+                                    {'ParameterKey': 'EnvironmentName', 'ParameterValue': config['EnvironmentName']},
+                                    {'ParameterKey': 'AgentRole', 'ParameterValue': config['AgentRole']},
+                                    {'ParameterKey': 'S3Bucket', 'ParameterValue': config['AgentS3Bucket']}
+                                ]
+                                
+                                try:
+                                    template_summary = cfn.get_template_summary(TemplateURL=template_url)
+                                    print(f"Template summary for {stack_name}:", template_summary)
+                                    
+                                    if 'Parameters' in template_summary:
+                                        template_params = [p['ParameterKey'] for p in template_summary['Parameters']]
+                                        
+                                        if 'VectorStoreName' in template_params:
+                                            if 'VectorStoreName' not in event['ResourceProperties']:
+                                                raise Exception("Template requires VectorStoreName but it's not provided in ResourceProperties")
+                                            base_params.append(
+                                                {'ParameterKey': 'VectorStoreName', 'ParameterValue': event['ResourceProperties']['VectorStoreName']}
+                                            )
+                                        
+                                        if 'ImagingStateMachineName' in template_params:
+                                            if 'ImagingStateMachineName' not in config:
+                                                raise Exception("Template requires ImagingStateMachineName but it's not provided in StackConfiguration")
+                                            base_params.append(
+                                                {'ParameterKey': 'ImagingStateMachineName', 'ParameterValue': config['ImagingStateMachineName']}
+                                            )
+                                        
+                                        if 'ImagingStateMachineArn' in template_params:
+                                            if 'ImagingStateMachineArn' not in config:
+                                                raise Exception("Template requires ImagingStateMachineArn but it's not provided in StackConfiguration")
+                                            base_params.append(
+                                                {'ParameterKey': 'ImagingStateMachineArn', 'ParameterValue': config['ImagingStateMachineArn']}
+                                            )
+                                
+                                except cfn.exceptions.ClientError as e:
+                                    print(f"Error getting template summary for {stack_name}: {str(e)}")
+                                    raise Exception(f"Failed to get template summary for {stack_name}: {str(e)}")
+
+                                create_params = {
+                                    'StackName': stack_name,
+                                    'TemplateURL': template_url,
+                                    'Capabilities': ['CAPABILITY_IAM','CAPABILITY_NAMED_IAM'],
+                                    'TimeoutInMinutes': 30,
+                                    'Parameters': base_params
+                                }
+                                
+                                try:
+                                    print(f"Creating stack {stack_name} with parameters:", create_params)
+                                    cfn.create_stack(**create_params)
+                                    pending_stacks.append({'name': stack_name, 'operation': 'CREATE'})
+                                except cfn.exceptions.AlreadyExistsException:
+                                    print(f"Stack {stack_name} already exists, updating...")
+                                    update_params = {
+                                        'StackName': stack_name,
+                                        'TemplateURL': template_url,
+                                        'Capabilities': ['CAPABILITY_IAM','CAPABILITY_NAMED_IAM'],
+                                        'Parameters': base_params
+                                    }
+                                    cfn.update_stack(**update_params)
+                                    pending_stacks.append({'name': stack_name, 'operation': 'UPDATE'})
+                                    
+                            except Exception as e:
+                                print(f"Error processing stack {stack_name}: {str(e)}")
+                                raise e
+
+                        # Wait for all stack operations to complete
+                        timeout = time.time() + 1800  # 30 minutes
+                        while pending_stacks and time.time() < timeout:
+                            for stack in pending_stacks[:]:
+                                try:
+                                    status = cfn.describe_stacks(StackName=stack['name'])['Stacks'][0]['StackStatus']
+                                    operation = stack['operation']
+                                    
+                                    if status == f'{operation}_COMPLETE':
+                                        pending_stacks.remove(stack)
+                                        print(f"Stack {stack['name']} {operation.lower()} completed successfully")
+                                    elif status == f'{operation}_IN_PROGRESS':
+                                        print(f"Stack {stack['name']} still in progress...")
+                                    elif status.endswith('FAILED') or status.endswith('ROLLBACK_COMPLETE'):
+                                        raise Exception(f"Stack {stack['name']} {operation.lower()} failed with status: {status}")
+                                        
+                                except cfn.exceptions.ClientError as e:
+                                    print(f"Error checking stack {stack['name']} status: {str(e)}")
+                                    raise e
+                            
+                            if pending_stacks:
+                                time.sleep(10)
+
+                        if pending_stacks:
+                            raise Exception(f"Timeout waiting for stacks to complete: {[s['name'] for s in pending_stacks]}")
+
+                        # Only send success response after all stacks are confirmed complete
+                        cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                      else:
+                        print("Workshop mode has been selected, skipping agent creation")
+                        cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+
+
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {
+                      'Error': str(e)
+                  })
 
   # Supervisor Agent (kept separate since it depends on other agents)
   SupervisorAgent:
     Type: AWS::CloudFormation::Stack
     DependsOn: AgentStacks
     Properties:
-      TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_supervisor_agent.yaml
+      TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_supervisor_agent.yaml
       Parameters:
-        BedrockModelId: !Ref BedrockModelId
         EnvironmentName: !Ref EnvironmentName
-        GitBranch: !Ref GitBranch
+        S3Bucket: !Ref S3Bucket
+      TimeoutInMinutes: 30
+
+
+  StreamlitUI:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: SupervisorAgent
+    Properties:
+      TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_streamlit_build.yaml
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
       TimeoutInMinutes: 30
