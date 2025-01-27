@@ -86,7 +86,7 @@ Resources:
   BedrockAgentFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Runtime: python3.12
+      Runtime: python3.13
       Handler: index.handler
       Role: !GetAtt CollaboratorLambdaRole.Arn
       Layers:
@@ -173,7 +173,7 @@ Resources:
   CollaboratorAssociationFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Runtime: python3.12
+      Runtime: python3.13
       Layers:
         - !Ref LambdaLayer
       Handler: index.handler
@@ -195,7 +195,6 @@ Resources:
           def handler(event, context):
               try:
                   if event['RequestType'] in ['Create', 'Update']:
-                      client = boto3.client('bedrock-agent')
                       supervisor_agent_id = event['ResourceProperties']['AgentId']
 
                       # Define sub-agents with their configurations
