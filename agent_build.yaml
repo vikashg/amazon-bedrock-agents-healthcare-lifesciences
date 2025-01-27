@@ -42,6 +42,7 @@ Parameters:
     AllowedValues:
       - main
       - multi-agent-collaboration
+      - multiagentfixes
   SubAgentS3Bucket:
     Type: String
     Description: 'The S3 bucket containing the Subagents'
@@ -1305,11 +1306,12 @@ Resources:
                   config = event['ResourceProperties']['StackConfiguration']
 
                   if event['RequestType'] == 'Delete':
+                      sorted_agents = sorted(agents, key=lambda x: 0 if x == 'supervisor_agent' else 1)
                       print(f"Delete request received, deleting {len(agents)} stacks")
                       
                       deleted_stacks = []
                       
-                      for agent in agents:
+                      for agent in sorted_agents:
                           stack_name = f"{config['EnvironmentName']}-{agent}"
                           try:
                               cfn.describe_stacks(StackName=stack_name)
@@ -1349,11 +1351,11 @@ Resources:
                   elif event['RequestType'] in ['Create', 'Update']:
                       MultiAgentDevModeStatus = event['ResourceProperties']['MultiAgentDevModeStatus']
                       if MultiAgentDevModeStatus == "false":
-
+                        sorted_agents = sorted(agents, key=lambda x: 1 if x == 'supervisor_agent' else 0)
                         # Track stacks being created/updated
                         pending_stacks = []
                         
-                        for agent in agents:
+                        for agent in sorted_agents:
                             stack_name = f"{config['EnvironmentName']}-{agent}"
                             print(f"Processing stack: {stack_name}")
                             template_url = f"https://{config['SourceS3Bucket']}.s3.{config['Region']}.amazonaws.com/packaged_{agent}.yaml"
@@ -1428,7 +1430,7 @@ Resources:
                                 raise e
 
                         # Wait for all stack operations to complete
-                        timeout = time.time() + 1800  # 30 minutes
+                        timeout = time.time() + 900  # 15 minutes
                         while pending_stacks and time.time() < timeout:
                             for stack in pending_stacks[:]:
                                 try:
