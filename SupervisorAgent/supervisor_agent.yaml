@@ -180,7 +180,6 @@ Resources:
       Role: !GetAtt CollaboratorLambdaRole.Arn
       Code:
         ZipFile: !Sub |
-          import boto3
           import cfnresponse
           import time
           import sys
