@@ -157,7 +157,7 @@ Resources:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: CleanupPolicy
+        - PolicyName: !Sub CleanupPolicy-${EnvironmentName}
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -1477,14 +1477,5 @@ Resources:
       Parameters:
         EnvironmentName: !Ref EnvironmentName
         S3Bucket: !Ref S3Bucket
-      TimeoutInMinutes: 30
-
-
-  StreamlitUI:
-    Type: AWS::CloudFormation::Stack
-    DependsOn: SupervisorAgent
-    Properties:
-      TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_streamlit_build.yaml
-      Parameters:
-        EnvironmentName: !Ref EnvironmentName
+        AgentRole: !GetAtt AgentRole.Arn
       TimeoutInMinutes: 30

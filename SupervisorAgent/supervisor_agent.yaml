@@ -9,6 +9,9 @@ Parameters:
   S3Bucket:
     Type: String
     Description: The S3 bucket containing the lambda function for the agent
+  AgentRole:
+    Type: String
+    Description: The arn for the agent
 
 Resources:
   BedrockAgentRole:
@@ -167,7 +170,7 @@ Resources:
   BedrockAgentCustomResource:
     Type: Custom::BedrockAgent
     Properties:
-      ServiceToken: !GetAtt BedrockAgentFunction.Arn
+      ServiceToken: !Ref AgentRole
       RoleArn: !GetAtt BedrockAgentRole.Arn
 
   CollaboratorAssociationFunction:
