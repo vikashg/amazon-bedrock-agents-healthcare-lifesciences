@@ -33,7 +33,7 @@ Resources:
                 Effect: Allow
                 Action: bedrock:InvokeModel
                 Resource:
-                  - arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0'
               - Sid: SupervisorAgentPolicy
                 Effect: Allow
                 Action:
@@ -74,17 +74,15 @@ Resources:
           Statement:
           - Effect: Allow
             Action:
-            - bedrock:*
-            - bedrock:ListAgentAliases
-            Resource: 
-            - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*'
-            - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*'
+              - bedrock:*
+            Resource:
+              - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*'
+              - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*'
           - Effect: Allow
             Action: iam:PassRole
-            Resource:
-              Fn::GetAtt:
-              - BedrockAgentRole
-              - Arn
+            Resource: 
+              - !GetAtt BedrockAgentRole.Arn
+              - !Ref AgentRole 
 
   BedrockAgentFunction:
     Type: AWS::Lambda::Function
@@ -171,7 +169,7 @@ Resources:
     Type: Custom::BedrockAgent
     Properties:
       ServiceToken: !GetAtt BedrockAgentFunction.Arn
-      RoleArn: !Sub AgentRole
+      RoleArn: !Ref AgentRole
 
   CollaboratorAssociationFunction:
     Type: AWS::Lambda::Function
