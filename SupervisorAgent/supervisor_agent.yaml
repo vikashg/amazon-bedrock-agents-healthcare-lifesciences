@@ -170,8 +170,8 @@ Resources:
   BedrockAgentCustomResource:
     Type: Custom::BedrockAgent
     Properties:
-      ServiceToken: !Ref AgentRole
-      RoleArn: !GetAtt BedrockAgentRole.Arn
+      ServiceToken: !GetAtt BedrockAgentFunction.Arn
+      RoleArn: !Sub AgentRole
 
   CollaboratorAssociationFunction:
     Type: AWS::Lambda::Function
