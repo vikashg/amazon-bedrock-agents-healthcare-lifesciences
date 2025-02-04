@@ -33,10 +33,20 @@ Parameters:
     Type: String
     Default: latest
     Description: Tag of the Docker image to deploy Streamlit UI
+  MultiAgentDevMode:
+    Type: String
+    Description: Select True to use a python notebook to manually create the agents step by step. Select false to auto create all agents. 
+    AllowedValues: 
+     - True
+     - False
   GitBranch:
     Type: String
-    Description: 'The github branch to clone, change only for dev testing'
-    Default: 'main'
+    Description: The github branch to clone 
+    Default: main
+    AllowedValues:
+      - main
+      - multi-agent-collaboration
+      - multiagentfixes
 
 Mappings:
   RegionMap:
@@ -61,7 +71,6 @@ Resources:
           ParameterValue: "true"
         - ParameterName: require_ssl
           ParameterValue: "true"
-
   RedshiftCluster:
     Type: AWS::Redshift::Cluster
     Properties:
@@ -112,6 +121,15 @@ Resources:
                   - !Sub arn:aws:s3:::${S3Bucket}/*
       
 
+  # Redshift Subnet Group
+  RedshiftSubnetGroup:
+    Type: AWS::Redshift::ClusterSubnetGroup
+    Properties:
+      Description: Redshift Subnet Group
+      SubnetIds:
+        - !Ref Subnet1
+        - !Ref Subnet2
+
   # Glue Connection
   JDBCConnection:
     Type: AWS::Glue::Connection
@@ -126,37 +144,25 @@ Resources:
           USERNAME: !Ref RedshiftUserName
           PASSWORD: !Ref RedshiftPassword
         PhysicalConnectionRequirements:
-          SubnetId: !Ref PrivateSubnet1
+          SubnetId: !Ref Subnet1
           SecurityGroupIdList: [!Ref SecurityGroup]
           AvailabilityZone: !Select 
             - 0
             - !GetAZs 
               Ref: 'AWS::Region'
 
-  
+  # Security Group
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Security group for Redshift cluster
+      GroupDescription: Security group for database access
       VpcId: !Ref VPC
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 5439
-          ToPort: 5439
-          CidrIp: 10.0.0.0/16  # Only allow access from within VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-RedshiftSG
-  RedshiftSubnetGroup:
-    Type: AWS::Redshift::ClusterSubnetGroup
-    Properties:
-      Description: Subnet group for Redshift cluster
-      SubnetIds:
-        - !Ref PrivateSubnet1
-        - !Ref PrivateSubnet2
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-RedshiftSubnetGroup
+        - IpProtocol: '-1'
+          FromPort: -1
+          ToPort: -1
+          CidrIp: '0.0.0.0/0'
+
   # VPC
   VPC:
     Type: AWS::EC2::VPC
@@ -164,105 +170,6 @@ Resources:
       CidrBlock: 10.0.0.0/16
       EnableDnsHostnames: true
       EnableDnsSupport: true
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-VPC
-  PrivateSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: 10.0.1.0/24
-      AvailabilityZone: !Select 
-        - 0
-        - !GetAZs 
-          Ref: 'AWS::Region'
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-PrivateSubnet1
-  PrivateSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: 10.0.2.0/24
-      AvailabilityZone: !Select 
-        - 1
-        - !GetAZs 
-          Ref: 'AWS::Region'
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-PrivateSubnet2
-  PublicSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: 10.0.3.0/24
-      AvailabilityZone: !Select 
-        - 0
-        - !GetAZs 
-          Ref: 'AWS::Region'
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-PublicSubnet1
-  NatGatewayEIP:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-  NatGateway:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt NatGatewayEIP.AllocationId
-      SubnetId: !Ref PublicSubnet1
-  PrivateRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-PrivateRouteTable
-
-  PrivateRoute:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway
-
-  PrivateSubnet1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PrivateSubnet1
-      RouteTableId: !Ref PrivateRouteTable
-
-  PrivateSubnet2RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PrivateSubnet2
-      RouteTableId: !Ref PrivateRouteTable
-
-  PublicRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Sub ${AWS::StackName}-PublicRouteTable
-
-  PublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: VPCGatewayAttachment
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
-
-  PublicSubnet1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PublicSubnet1
-      RouteTableId: !Ref PublicRouteTable
-
-
 
   # Internet Gateway
   InternetGateway:
@@ -274,6 +181,28 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
+
+  # Subnet 1
+  Subnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select 
+        - 0
+        - !GetAZs 
+          Ref: 'AWS::Region'
+      CidrBlock: 10.0.1.0/24
+      VpcId: !Ref VPC
+
+  # Subnet 2
+  Subnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select 
+        - 1
+        - !GetAZs 
+          Ref: 'AWS::Region'
+      CidrBlock: 10.0.2.0/24
+      VpcId: !Ref VPC
   
   S3Bucket:
     Type: AWS::S3::Bucket
@@ -546,43 +475,21 @@ Resources:
                 Action: 
                   - 's3:GetObject'
                   - 's3:ListBucket'
-                  - 's3:HeadObject'
-                  - 's3:GetObjectAttributes'
                 Resource: 
-                  - !Sub 'arn:aws:s3:::biomarkers-discovery-agent-test-${AWS::Region}-${AWS::AccountId}'
-                  - !Sub 'arn:aws:s3:::biomarkers-discovery-agent-test-${AWS::Region}-${AWS::AccountId}/*'
+                  - 'arn:aws:s3:::*'
+                  - 'arn:aws:s3:::*/*'
               - Effect: 'Allow'
                 Action: 
                   - 'redshift-data:*'
                   - 'redshift:*'
-                Resource: 
-                  - !Sub 'arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:dbuser:biomarker-redshift-cluster/*'
-                  - !Sub 'arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:dbuser:biomarker-redshift-cluster'
+                Resource: '*'
               - Effect: 'Allow'
                 Action: 
                   - 'ec2:CreateNetworkInterface'
-                  - 'ec2:DeleteNetworkInterface'
                   - 'ec2:DescribeNetworkInterfaces'
-                Resource: 
-                  - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:network-interface/*'
-              - Effect: 'Allow'
-                Action:
-                  - 'ec2:DescribeSecurityGroups'
-                  - 'ec2:DescribeSubnets'
-                  - 'ec2:DescribeVpcs'
-                Resource:
-                  - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:security-group/${SecurityGroup}'
-                  - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet1}'
-                  - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:subnet/${PrivateSubnet2}'
-                  - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:vpc/${VPC}'
-              - Effect: 'Allow'
-                Action: 
-                  - 'redshift:*'
-                  - 'redshift-data:*'
-                Resource: 
-                  - !Sub arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:cluster:biomarker-redshift-cluster
-                  - !Sub arn:aws:redshift:${AWS::Region}:${AWS::AccountId}:dbname:biomarker-redshift-cluster/dev
-              
+                  - 'ec2:DeleteNetworkInterface'
+                Resource: '*'
+
   LambdaFunction:
     Type: 'AWS::Lambda::Function'
     Properties:
@@ -598,7 +505,6 @@ Resources:
           import redshift_connector
           import pandas as pd
           import time
-          print("hello")
 
           s3_client = boto3.client('s3')
           redshift_data = boto3.client('redshift-data')
@@ -1096,20 +1002,60 @@ Resources:
                   - !Sub arn:aws:s3:::${S3Bucket}
                   - !Sub arn:aws:s3:::${S3Bucket}/*
   
-
-
-  
+  # AgentandUICodeBuild:
+  #   Type: AWS::CodeBuild::Project
+  #   Properties:
+  #     Name: !Sub ${AWS::StackName}-AgentandUIBuild
+  #     Description: "CodeBuild project to build the agent build CloudFormation template"
+  #     ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+  #     Artifacts:
+  #       Type: S3
+  #       Location: !Ref S3Bucket
+  #       Name: packaged_agent_build.yaml
+  #       NamespaceType: NONE
+  #       Packaging: NONE
+  #     Environment:
+  #       Type: LINUX_CONTAINER
+  #       ComputeType: BUILD_GENERAL1_SMALL
+  #       Image: aws/codebuild/amazonlinux2-x86_64-standard:3.0
+  #     Source:
+  #       Type: NO_SOURCE
+  #       BuildSpec: !Sub |
+  #         version: 0.2
+  #         phases:
+  #           install:
+  #             runtime-versions:
+  #               python: 3.8
+  #           pre_build:
+  #             commands:
+  #               - echo Cloning the repository
+  #               - git clone -b ${GitBranch} --single-branch ${GithubLink} repo
+  #               - cd repo
+  #           build:
+  #             commands:
+  #               - echo Packaging the CloudFormation template
+  #               - aws cloudformation package --template-file agent_build.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_agent_build.yaml
+  #               - cd streamlitapp
+  #               - aws cloudformation package --template-file streamlit_build.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_streamlit_build.yaml
+  #               - 
+  #           post_build:
+  #             commands:
+  #               - echo Build completed on `date`
+  #               - echo Copying packaged template to S3
+  #               - aws s3 cp packaged_streamlit_build.yaml s3://${S3Bucket}/packaged_streamlit_build.yaml
+  #               - cd ..
+  #               - aws s3 cp packaged_agent_build.yaml s3://${S3Bucket}/packaged_agent_build.yaml
+  #     TimeoutInMinutes: 15
   AgentandUICodeBuild:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Sub ${AWS::StackName}-AgentandUIBuild
-      Description: "CodeBuild project to build and package agent CloudFormation templates"
+      Description: "CodeBuild project to build the agent build CloudFormation template"
       ServiceRole: !GetAtt CodeBuildServiceRole.Arn
-      TimeoutInMinutes: 15
       Artifacts:
         Type: S3
         Location: !Ref S3Bucket
-        Name: packaged_agents
+        Name: packaged_agent_build.yaml
         NamespaceType: NONE
         Packaging: NONE
       Environment:
@@ -1120,11 +1066,6 @@ Resources:
         Type: NO_SOURCE
         BuildSpec: !Sub |
           version: 0.2
-          env:
-            variables:
-              S3_BUCKET: ${S3Bucket}
-              GIT_BRANCH: ${GitBranch}
-              GITHUB_LINK: ${GithubLink}
           phases:
             install:
               runtime-versions:
@@ -1132,17 +1073,46 @@ Resources:
             pre_build:
               commands:
                 - echo Cloning the repository
-                - git clone -b $GIT_BRANCH --single-branch $GITHUB_LINK repo
+                - git clone -b ${GitBranch} --single-branch ${GithubLink} repo
                 - cd repo
-                - chmod +x build_agents.sh
             build:
               commands:
-                - echo Processing agent templates
-                - ./build_agents.sh
+                - echo Starting build process
+                # Package and upload individual agent templates
+                - cd agents
+                - |
+                  for file in *.yaml *.yml; do
+                    if [ -f "$file" ]; then
+                      echo "Packaging $file"
+                      aws cloudformation package \
+                        --template-file $file \
+                        --s3-bucket ${S3Bucket} \
+                        --output-template-file packaged_$file
+                      echo "Uploading packaged template to S3"
+                      aws s3 cp packaged_$file s3://${S3Bucket}/packaged_$file
+                    fi
+                  done
+                # Package and upload supervisor agent
+                - cd ../SupervisorAgent
+                - echo "Packaging supervisor_agent.yaml"
+                - aws cloudformation package --template-file supervisor_agent.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_supervisor_agent.yaml
+                - echo "Uploading packaged supervisor template to S3"
+                - aws s3 cp packaged_supervisor_agent.yaml s3://${S3Bucket}/packaged_supervisor_agent.yaml
+                # Package and upload main template
+                - cd ..
+                - echo "Packaging main agent_build.yaml"
+                - aws cloudformation package --template-file agent_build.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_agent_build.yaml
+                - echo "Uploading main packaged template to S3"
+                - aws s3 cp packaged_agent_build.yaml s3://${S3Bucket}/packaged_agent_build.yaml
+                # Package and upload streamlit template
+                - cd streamlitapp
+                - echo "Packaging streamlit template"
+                - aws cloudformation package --template-file streamlit_build.yaml --s3-bucket ${S3Bucket} --output-template-file packaged_streamlit_build.yaml
+                - echo "Uploading streamlit packaged template to S3"
+                - aws s3 cp packaged_streamlit_build.yaml s3://${S3Bucket}/packaged_streamlit_build.yaml
             post_build:
               commands:
                 - echo Build completed on `date`
- 
 
   AgentBuildNestedStack:
     Type: AWS::CloudFormation::Stack
@@ -1156,6 +1126,7 @@ Resources:
         BedrockModelId: !Ref BedrockModelId
         EnvironmentName: !Ref EnvironmentName
         GitBranch: !Ref GitBranch
+        MultiAgentDevMode: !Ref MultiAgentDevMode
         SubAgentS3Bucket: !Ref S3Bucket
       TimeoutInMinutes: 30
   StreamlitBuildNestedStack:

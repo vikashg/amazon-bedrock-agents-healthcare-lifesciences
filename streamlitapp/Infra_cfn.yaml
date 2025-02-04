@@ -41,11 +41,8 @@ Parameters:
      - False
   GitBranch:
     Type: String
-    Description: The github branch to clone 
-    Default: main
-    AllowedValues:
-      - main
-      - multi-agent-collaboration
+    Description: 'The github branch to clone, change only for dev testing'
+    Default: 'main'
 
 Mappings:
   RegionMap:
