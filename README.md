@@ -13,11 +13,23 @@ Multi-Agent Notebook Deployment Steps:
 
 Step 1: Click the 'Launch Stack' button located in the [Deployment](#deployment) section to deploy the underlying AWS infrastructure
 
-Step 2: Navigate to the multi_agent_development/ folder and download the files located there
+Step 2: Go to a SageMaker Studio JupyterLab environment in your AWS account and clone this repository in a terminal
 
-Step 3: Go to a SageMaker Studio JupyterLab environment in your AWS account and upload the multi_agent_development/ files there, use the Python 3 (ipykernel)
+```bash
+git clone https://github.com/aws-samples/amazon-bedrock-agents-cancer-biomarker-discovery.git
+```
 
-Step 4: Follow the step-by-step instructions starting from the setup_environment.ipynb notebook in multi_agent_development/0-Notebook-environment/
+Step 3: Navigate to the multi-agent-collaboration branch within the repository
+```bash
+cd amazon-bedrock-agents-cancer-biomarker-discovery
+```
+```bash
+git checkout multi-agent-collaboration
+```
+
+Step 4: Navigate to multi_agent_development/0-Notebook-environment/ and go to setup_environment.ipynb, use the Python 3 (ipykernel)
+
+Step 5: Proceed to build each agent using the notebooks
 
 ## Overview
 The success rate for Phase I oncology clinical trials is significantly low. According to a study published in Nature Reviews Drug Discovery, the overall success rate for oncology drugs from Phase I to approval is around 5%, indicating a high failure rate of approximately 95%. 
