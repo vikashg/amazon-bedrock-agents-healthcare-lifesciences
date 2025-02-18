@@ -37,6 +37,13 @@ Parameters:
     Type: String
     Description: 'The github branch to clone, change only for dev testing'
     Default: 'main'
+  MultiAgentDevMode:
+    Type: String
+    Description: Select True to use a python notebook to manually create the agents step by step. Select false to auto create all agents. 
+    AllowedValues: 
+     - True
+     - False
+
 
 Mappings:
   RegionMap:
@@ -1157,6 +1164,7 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         GitBranch: !Ref GitBranch
         SubAgentS3Bucket: !Ref S3Bucket
+        MultiAgentDevMode: !Ref MultiAgentDevMode
       TimeoutInMinutes: 30
   StreamlitBuildNestedStack:
     Type: AWS::CloudFormation::Stack
