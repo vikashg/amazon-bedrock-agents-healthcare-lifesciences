@@ -1065,11 +1065,12 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - bedrock:InvokeModel
-                  - bedrock:Retrieve
+                  - bedrock:*
                 Resource: 
                   - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModelId}
                   - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*
 
 
   S3BucketNameSSMParameter:
@@ -1478,4 +1479,5 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         S3Bucket: !Ref S3Bucket
         AgentRole: !GetAtt AgentRole.Arn
+        BedrockModelId: !Ref BedrockModelId
       TimeoutInMinutes: 30

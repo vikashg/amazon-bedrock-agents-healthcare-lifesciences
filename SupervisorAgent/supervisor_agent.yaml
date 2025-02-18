@@ -12,6 +12,9 @@ Parameters:
   AgentRole:
     Type: String
     Description: The arn for the agent
+  BedrockModelId:
+    Type: String
+    Description: Model ID for the Supervisor Agent
 
 Resources:
   BedrockAgentRole:
@@ -33,7 +36,7 @@ Resources:
                 Effect: Allow
                 Action: bedrock:InvokeModel
                 Resource:
-                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModelId}'
               - Sid: SupervisorAgentPolicy
                 Effect: Allow
                 Action:
