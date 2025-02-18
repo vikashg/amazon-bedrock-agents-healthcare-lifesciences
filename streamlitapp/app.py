@@ -8,8 +8,25 @@ from botocore.exceptions import EventStreamError
 import json
 import os
 import tempfile
+import sys
+import argparse
 temp_dir = tempfile.mkdtemp()
-environmentName = "env1"
+def get_environment():
+    try:
+        # Find the index of '--' in sys.argv
+        separator_index = sys.argv.index('--')
+        # Get all arguments after '--'
+        args = sys.argv[separator_index + 1:]
+        
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--env', type=str, required=True)
+        parsed_args, _ = parser.parse_known_args(args)
+        return parsed_args.env
+    except (ValueError, IndexError):
+        raise ValueError("Environment parameter not found. Please provide --env parameter.")
+
+
+environmentName = get_environment()
 
 ssm_client = boto3.client('ssm')
 
@@ -183,8 +200,8 @@ def response_generator():
     
     try: 
         response = client.invoke_agent(
-                    agentId= agent_id,  #"7UQAQVE4RN", #"TQKAONPNLP",
-                    agentAliasId= agent_alias_id, #"CIFA2SV5WR",
+                    agentId= agent_id,  
+                    agentAliasId= agent_alias_id, 
                     sessionId=session_id,
                     inputText=messagesStr,
                     enableTrace=enableTrace, 
