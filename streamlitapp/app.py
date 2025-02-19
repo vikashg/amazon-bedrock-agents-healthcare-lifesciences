@@ -28,11 +28,11 @@ environmentName = get_environment()
 
 ssm_client = boto3.client('ssm')
 
-agent_id = (ssm_client.get_parameter(Name=f"/streamlitapp/env4/AGENT_ID", WithDecryption=True)["Parameter"]["Value"])
+agent_id = (ssm_client.get_parameter(Name=f"/streamlitapp/{environmentName}/AGENT_ID", WithDecryption=True)["Parameter"]["Value"])
            
-agent_alias_id = (ssm_client.get_parameter(Name=f"/streamlitapp/env4/AGENT_ALIAS_ID",WithDecryption=True,)["Parameter"]["Value"])
+agent_alias_id = (ssm_client.get_parameter(Name=f"/streamlitapp/{environmentName}/AGENT_ALIAS_ID",WithDecryption=True,)["Parameter"]["Value"])
 
-s3_bucket_name = (ssm_client.get_parameter(Name=f"/streamlitapp/env4/S3_BUCKET_NAME",WithDecryption=True,)["Parameter"]["Value"])
+s3_bucket_name = (ssm_client.get_parameter(Name=f"/streamlitapp/{environmentName}/S3_BUCKET_NAME",WithDecryption=True,)["Parameter"]["Value"])
 
 def list_png_files():
         try:
@@ -208,8 +208,19 @@ def response_generator():
         #progress_text = "Operation in progress. Please wait."
         #my_bar = st.progress(0, text=progress_text)
     
-    except EventStreamError:
-        print("error")    
+    # except EventStreamError:
+    #     print("error")   
+    except Exception as e:
+        print("Detailed Error Information:")
+        print(f"Agent ID: {agent_id}")
+        print(f"Agent Alias ID: {agent_alias_id}")
+        print(f"Session ID: {session_id}")
+        print(f"Error Type: {type(e).__name__}")
+        print(f"Error Message: {str(e)}")
+        if hasattr(e, 'response'):
+            print(f"Error Response: {e.response}")
+    
+        raise e
     
     percent_complete = 10
     
