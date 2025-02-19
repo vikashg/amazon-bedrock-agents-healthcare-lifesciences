@@ -11,30 +11,28 @@ import tempfile
 import sys
 import argparse
 temp_dir = tempfile.mkdtemp()
+
 def get_environment():
     try:
-        # Find the index of '--' in sys.argv
-        separator_index = sys.argv.index('--')
-        # Get all arguments after '--'
-        args = sys.argv[separator_index + 1:]
-        
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--env', type=str, required=True)
-        parsed_args, _ = parser.parse_known_args(args)
-        return parsed_args.env
+        # Get arguments after the '--' separator in the streamlit command
+        env_index = sys.argv.index('--env') + 1
+        if env_index < len(sys.argv):
+            return sys.argv[env_index]
+        raise ValueError("No value found after --env parameter")
     except (ValueError, IndexError):
         raise ValueError("Environment parameter not found. Please provide --env parameter.")
+
 
 
 environmentName = get_environment()
 
 ssm_client = boto3.client('ssm')
 
-agent_id = (ssm_client.get_parameter(Name=f"/streamlitapp/{environmentName}/AGENT_ID", WithDecryption=True)["Parameter"]["Value"])
+agent_id = (ssm_client.get_parameter(Name=f"/streamlitapp/env4/AGENT_ID", WithDecryption=True)["Parameter"]["Value"])
            
-agent_alias_id = (ssm_client.get_parameter(Name=f"/streamlitapp/{environmentName}/AGENT_ALIAS_ID",WithDecryption=True,)["Parameter"]["Value"])
+agent_alias_id = (ssm_client.get_parameter(Name=f"/streamlitapp/env4/AGENT_ALIAS_ID",WithDecryption=True,)["Parameter"]["Value"])
 
-s3_bucket_name = (ssm_client.get_parameter(Name=f"/streamlitapp/{environmentName}/S3_BUCKET_NAME",WithDecryption=True,)["Parameter"]["Value"])
+s3_bucket_name = (ssm_client.get_parameter(Name=f"/streamlitapp/env4/S3_BUCKET_NAME",WithDecryption=True,)["Parameter"]["Value"])
 
 def list_png_files():
         try:
