@@ -46,6 +46,8 @@ Resources:
                 Resource:
                   - arn:aws:bedrock:*:*:agent/*
                   - arn:aws:bedrock:*:*:agent-alias/*
+                  - "arn:aws:bedrock:*:*:application-inference-profile/*"
+                  - "arn:aws:bedrock:*:*:inference-profile/*"
 
   LambdaLayer:
     Type: AWS::Lambda::LayerVersion
@@ -81,6 +83,8 @@ Resources:
             Resource:
               - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*'
               - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*'
+              - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*'
+              - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:application-inference-profile/*'
           - Effect: Allow
             Action: iam:PassRole
             Resource: 
