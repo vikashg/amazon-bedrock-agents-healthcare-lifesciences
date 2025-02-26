@@ -18,50 +18,50 @@ Parameters:
 
 Resources:
   BedrockAgentRole:
-  Type: 'AWS::IAM::Role'
-  Properties:
-    AssumeRolePolicyDocument:
-      Version: '2012-10-17'
-      Statement:
-        - Effect: Allow
-          Principal:
-            Service: bedrock.amazonaws.com
-          Action: sts:AssumeRole
-    Policies:
-      - PolicyName: BedrockAgentCustomPolicy
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Sid: AmazonBedrockAgentBedrockFoundationModelPolicy
-              Effect: Allow
-              Action: 
-                - bedrock:InvokeModel*
-                - bedrock:CreateInferenceProfile
-              Resource:
-                - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/*'
-                - !Sub 'arn:aws:bedrock:${AWS::Region}::inference-profile/*'
-                - !Sub 'arn:aws:bedrock:${AWS::Region}::application-inference-profile/*'
-            - Sid: SupervisorAgentPolicy
-              Effect: Allow
-              Action:
-                - bedrock:*
-              Resource:
-                - arn:aws:bedrock:*:*:agent/*
-                - arn:aws:bedrock:*:*:agent-alias/*
-                - arn:aws:bedrock:*:*:application-inference-profile/*
-                - arn:aws:bedrock:*:*:inference-profile/*
-            - Sid: InferenceProfileManagementPolicy
-              Effect: Allow
-              Action:
-                - bedrock:GetInferenceProfile
-                - bedrock:ListInferenceProfiles
-                - bedrock:DeleteInferenceProfile
-                - bedrock:TagResource
-                - bedrock:UntagResource
-                - bedrock:ListTagsForResource
-              Resource:
-                - arn:aws:bedrock:*:*:inference-profile/*
-                - arn:aws:bedrock:*:*:application-inference-profile/*
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BedrockAgentCustomPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: AmazonBedrockAgentBedrockFoundationModelPolicy
+                Effect: Allow
+                Action: 
+                  - bedrock:InvokeModel*
+                  - bedrock:CreateInferenceProfile
+                Resource:
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::inference-profile/*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::application-inference-profile/*'
+              - Sid: SupervisorAgentPolicy
+                Effect: Allow
+                Action:
+                  - bedrock:*
+                Resource:
+                  - arn:aws:bedrock:*:*:agent/*
+                  - arn:aws:bedrock:*:*:agent-alias/*
+                  - arn:aws:bedrock:*:*:application-inference-profile/*
+                  - arn:aws:bedrock:*:*:inference-profile/*
+              - Sid: InferenceProfileManagementPolicy
+                Effect: Allow
+                Action:
+                  - bedrock:GetInferenceProfile
+                  - bedrock:ListInferenceProfiles
+                  - bedrock:DeleteInferenceProfile
+                  - bedrock:TagResource
+                  - bedrock:UntagResource
+                  - bedrock:ListTagsForResource
+                Resource:
+                  - arn:aws:bedrock:*:*:inference-profile/*
+                  - arn:aws:bedrock:*:*:application-inference-profile/*
 
   LambdaLayer:
     Type: AWS::Lambda::LayerVersion
