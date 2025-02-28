@@ -8,8 +8,23 @@ from botocore.exceptions import EventStreamError
 import json
 import os
 import tempfile
+import sys
+import argparse
 temp_dir = tempfile.mkdtemp()
-environmentName = "env1"
+
+def get_environment():
+    try:
+        # Get arguments after the '--' separator in the streamlit command
+        env_index = sys.argv.index('--env') + 1
+        if env_index < len(sys.argv):
+            return sys.argv[env_index]
+        raise ValueError("No value found after --env parameter")
+    except (ValueError, IndexError):
+        raise ValueError("Environment parameter not found. Please provide --env parameter.")
+
+
+
+environmentName = get_environment()
 
 ssm_client = boto3.client('ssm')
 
@@ -183,8 +198,8 @@ def response_generator():
     
     try: 
         response = client.invoke_agent(
-                    agentId= agent_id,  #"7UQAQVE4RN", #"TQKAONPNLP",
-                    agentAliasId= agent_alias_id, #"CIFA2SV5WR",
+                    agentId= agent_id,  
+                    agentAliasId= agent_alias_id, 
                     sessionId=session_id,
                     inputText=messagesStr,
                     enableTrace=enableTrace, 
@@ -193,8 +208,19 @@ def response_generator():
         #progress_text = "Operation in progress. Please wait."
         #my_bar = st.progress(0, text=progress_text)
     
-    except EventStreamError:
-        print("error")    
+    # except EventStreamError:
+    #     print("error")   
+    except Exception as e:
+        print("Detailed Error Information:")
+        print(f"Agent ID: {agent_id}")
+        print(f"Agent Alias ID: {agent_alias_id}")
+        print(f"Session ID: {session_id}")
+        print(f"Error Type: {type(e).__name__}")
+        print(f"Error Message: {str(e)}")
+        if hasattr(e, 'response'):
+            print(f"Error Response: {e.response}")
+    
+        raise e
     
     percent_complete = 10
     
