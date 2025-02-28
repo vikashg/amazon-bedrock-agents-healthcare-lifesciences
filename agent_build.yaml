@@ -60,7 +60,8 @@ Mappings:
     us-west-2:
       PandasLayer: 'arn:aws:lambda:us-west-2:336392948345:layer:AWSSDKPandas-Python312:12'
 
-
+Conditions:
+  AutoCreateAgents: !Equals [!Ref MultiAgentDevMode, "False"]
 
 Resources:
   # Create ECR repository
@@ -1476,6 +1477,7 @@ Resources:
   SupervisorAgent:
     Type: AWS::CloudFormation::Stack
     DependsOn: AgentStacks
+    Condition: AutoCreateAgents
     Properties:
       TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_supervisor_agent.yaml
       Parameters:
