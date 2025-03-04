@@ -10,9 +10,10 @@ This folder provides resources need to evaluate a Biomarker Supervisor Agent aga
 
 1. Create a SageMaker Notebook instance in your AWS account
 
-2. Open a terminal in it and clone this repository
+2. Open a terminal in it and clone this repository to the SageMaker/ folder
 
 ```bash
+cd SageMaker/
 git clone https://github.com/aws-samples/amazon-bedrock-agents-cancer-biomarker-discovery.git
 ```
 
