@@ -1,4 +1,17 @@
-# Accelerate analysis and discovery of cancer biomarkers with Agents for Bedrock
+# Research agents for LifeSciences with Amazon Bedrock Agents
+
+Explore the following components:
+## Agent catalog
+Library of specialized agents for different R&D workflows
+## Multi-agent collaboration
+Framework for agent collaboration and knowledge sharing. End to end example for cancer biomarker discovery
+## Deployment
+One-click deployment of infrastructure and interactive interface for human-agent chat
+## Evaluation
+Methods for assessing agent performance and result quality. End to end example for cancer biomarker discovery
+
+
+# Multi-agent collaboration example: Accelerate analysis and discovery of cancer biomarkers with Agents for Bedrock
 
 **Note: Biomarker Agents can now be deployed with Bedrock multi-agent collaboration in your AWS account!
 
