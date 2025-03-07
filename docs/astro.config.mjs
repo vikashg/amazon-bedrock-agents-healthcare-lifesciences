@@ -23,10 +23,10 @@ export default defineConfig({
       {
         label: 'Components',
         items: [
-          { label: 'Agents Catalog', link: '/agents_catalog/' },
-          { label: 'Multi-Agent Orchestration', link: '/multi_agent_orchestration/' },
-          { label: 'Deployment', link: '/deployment/' },
-          { label: 'Evaluations', link: '/evaluations/' },
+          { label: 'Agents Catalog', link: './agents_catalog/' },
+          { label: 'Multi-Agent Orchestration', link: './multi_agent_orchestration/' },
+          { label: 'Deployment', link: './deployment/' },
+          { label: 'Evaluations', link: './evaluations/' },
         ]
       },
     ],
