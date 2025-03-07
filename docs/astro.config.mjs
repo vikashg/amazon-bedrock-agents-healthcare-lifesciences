@@ -4,6 +4,9 @@ import starlight from '@astrojs/starlight';
 import mdx from '@astrojs/mdx';
 
 export default defineConfig({
+  site: 'https://aws-samples.github.io',
+  base: '/amazon-bedrock-agents-healthcare-lifesciences',
+  trailingSlash: 'always',
   integrations: [starlight({
     title: 'Amazon Bedrock Agents for Healthcare and LifeSciences',
     social: {
@@ -20,10 +23,10 @@ export default defineConfig({
       {
         label: 'Components',
         items: [
-          { label: 'Agents Catalog', link: '/agents_catalog/' },
-          { label: 'Multi-Agent Orchestration', link: '/multi_agent_orchestration/' },
-          { label: 'Deployment', link: '/deployment/' },
-          { label: 'Evaluations', link: '/evaluations/' },
+          { label: 'Agents Catalog', link: './agents_catalog/' },
+          { label: 'Multi-Agent Orchestration', link: './multi_agent_orchestration/' },
+          { label: 'Deployment', link: './deployment/' },
+          { label: 'Evaluations', link: './evaluations/' },
         ]
       },
     ],
