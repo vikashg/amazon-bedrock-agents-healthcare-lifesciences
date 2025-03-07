@@ -1,7 +1,7 @@
 # Research agents for LifeSciences with Amazon Bedrock Agents
 
-Explore the following components:
-## Agent catalog
+Explore the following components in the repository:
+## Agents catalog
 Library of specialized agents for different R&D workflows
 ## Multi-agent collaboration
 Framework for agent collaboration and knowledge sharing. End to end example for cancer biomarker discovery
