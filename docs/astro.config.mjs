@@ -6,6 +6,8 @@ import mdx from '@astrojs/mdx';
 export default defineConfig({
   integrations: [starlight({
     title: 'Amazon Bedrock Agents for Healthcare and LifeSciences',
+    site: 'https://aws-samples.github.io',
+    base: '/amazon-bedrock-agents-healthcare-lifesciences',
     social: {
       github: 'https://github.com/aws-samples/amazon-bedrock-agents-cancer-biomarker-discovery/tree/multi-agent-collaboration',
     },
