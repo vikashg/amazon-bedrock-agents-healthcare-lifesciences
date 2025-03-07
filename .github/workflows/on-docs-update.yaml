@@ -24,11 +24,11 @@ jobs:
       - name: Install, build, and upload documentation
         uses: withastro/action@v2
         with:
-          path: ./docs
+          path: docs
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          path: ./docs/dist
+          path: docs/dist
 
   # Deploy the documentation to GitHub Pages.
   deploy:
