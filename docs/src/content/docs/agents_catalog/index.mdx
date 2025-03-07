@@ -1,0 +1,25 @@
+---
+title: Agents catalog overview
+description: An introduction to the Agents available in the catalog
+template: splash
+hero:
+  tagline: Agent catalog for life sciences
+  image:
+    file: ../../../assets/architecture_details.jpg
+    alt: AI agents that access various data sources and execute tools
+---
+
+An agent helps users complete actions based on both proprietary and public data and user input. Agents orchestrate interactions between foundation models (FMs), data sources, software applications, and user conversations. In addition, agents automatically call APIs to take actions and search knowledge bases to supplement information for these actions. 
+
+## Available Agents
+
+- **[Biomarker database analyst]** Convert natural language questions to SQL statements and execute on an Amazon Redshift database of biomarkers.
+
+- **[Clinical evidence researcher]** Use PubMed APIs to search biomedical literature for external evidence. Use Amazon Bedrock Knowledge Bases for Retrieval Augmented Generation (RAG) to deliver responses from internal literature evidence.
+
+- **[Statistician]** Use a custom container with lifelines library to build survival regression models and visualization such as Kaplan Meier charts for survival analysis.
+
+- **[Medical imaging expert]** Use Amazon SageMaker jobs to augment agents with the capability to trigger asynchronous jobs with an ephemeral cluster to process CT scan images.
+
+- **[Custom agent]** Bring your own dataset - structured, unstructured, graph or bring your own tool to build a custom agent
+
