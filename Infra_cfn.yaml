@@ -1152,34 +1152,34 @@ Resources:
             post_build:
               commands:
                 - echo Build completed on `date`
-  # AgentBuildNestedStack:
-  #   Type: AWS::CloudFormation::Stack
-  #   DependsOn: 
-  #     - TriggerAgentBuildCustomResource
-  #     - CleanupCustomResource
-  #     - RedshiftCluster
-  #   Properties:
-  #     TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_agent_build.yaml
-  #     Parameters:
-  #       BedrockModelId: !Ref BedrockModelId
-  #       MultiAgentDevMode: !Ref MultiAgentDevMode
-  #       EnvironmentName: !Ref EnvironmentName
-  #       GitBranch: !Ref GitBranch
-  #       SubAgentS3Bucket: !Ref S3Bucket
-  #       MultiAgentDevMode: !Ref MultiAgentDevMode
-  #     TimeoutInMinutes: 30
-  # StreamlitBuildNestedStack:
-  #   Type: AWS::CloudFormation::Stack
-  #   DependsOn: 
-  #     - AgentBuildNestedStack
-  #   Properties:
-  #     TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_streamlit_build.yaml
-  #     Parameters:
-  #       EnvironmentName: !Ref EnvironmentName
-  #       GitRepoURL: !Ref GithubLink
-  #       ImageTag: !Ref ImageTag
-  #       GitBranch: !Ref GitBranch
-  #     TimeoutInMinutes: 35
+  AgentBuildNestedStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: 
+      - TriggerAgentBuildCustomResource
+      - CleanupCustomResource
+      - RedshiftCluster
+    Properties:
+      TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_agent_build.yaml
+      Parameters:
+        BedrockModelId: !Ref BedrockModelId
+        MultiAgentDevMode: !Ref MultiAgentDevMode
+        EnvironmentName: !Ref EnvironmentName
+        GitBranch: !Ref GitBranch
+        SubAgentS3Bucket: !Ref S3Bucket
+        MultiAgentDevMode: !Ref MultiAgentDevMode
+      TimeoutInMinutes: 30
+  StreamlitBuildNestedStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: 
+      - AgentBuildNestedStack
+    Properties:
+      TemplateURL: !Sub https://${S3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_streamlit_build.yaml
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        GitRepoURL: !Ref GithubLink
+        ImageTag: !Ref ImageTag
+        GitBranch: !Ref GitBranch
+      TimeoutInMinutes: 35
 Outputs:
   RedshiftClusterEndpoint:
     Description: Redshift Cluster Endpoint
