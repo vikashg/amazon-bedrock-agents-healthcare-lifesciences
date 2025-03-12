@@ -45,7 +45,7 @@ Parameters:
     Default: main
     AllowedValues:
       - main
-      - multi-agent-collaboratio
+      - multi-agent-collaboration
 
 
 Mappings:
