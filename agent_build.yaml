@@ -5,7 +5,7 @@ Parameters:
   BedrockModelId:
     Type: String
     Description: The ID of the Foundation Model to use for the Agent
-    Default: anthropic.claude-3-sonnet-20240229-v1:0
+    Default: us.anthropic.claude-3-5-sonnet-20241022-v2:0
   EnvironmentName:
     Type: String
     Description: The name of the agent environment, used to differentiate agent application. Must be lowercase, contain one number, and be no more than 5 characters long.
@@ -60,7 +60,8 @@ Mappings:
     us-west-2:
       PandasLayer: 'arn:aws:lambda:us-west-2:336392948345:layer:AWSSDKPandas-Python312:12'
 
-
+Conditions:
+  AutoCreateAgents: !Equals [!Ref MultiAgentDevMode, "false"]
 
 Resources:
   # Create ECR repository
@@ -1065,12 +1066,16 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - bedrock:InvokeModel
-                  - bedrock:Retrieve
+                  - bedrock:*
                 Resource: 
-                  - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModelId}
+                  - !Sub arn:aws:bedrock:*::foundation-model/*
                   - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*
-
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:application-inference-profile/*
+            
+                
 
   S3BucketNameSSMParameter:
     Type: AWS::SSM::Parameter
@@ -1472,10 +1477,12 @@ Resources:
   SupervisorAgent:
     Type: AWS::CloudFormation::Stack
     DependsOn: AgentStacks
+    Condition: AutoCreateAgents
     Properties:
       TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_supervisor_agent.yaml
       Parameters:
         EnvironmentName: !Ref EnvironmentName
         S3Bucket: !Ref S3Bucket
         AgentRole: !GetAtt AgentRole.Arn
+        BedrockModelId: !Ref BedrockModelId
       TimeoutInMinutes: 30
