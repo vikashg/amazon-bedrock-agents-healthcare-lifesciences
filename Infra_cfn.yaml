@@ -1166,7 +1166,6 @@ Resources:
         EnvironmentName: !Ref EnvironmentName
         GitBranch: !Ref GitBranch
         SubAgentS3Bucket: !Ref S3Bucket
-        MultiAgentDevMode: !Ref MultiAgentDevMode
       TimeoutInMinutes: 30
   StreamlitBuildNestedStack:
     Type: AWS::CloudFormation::Stack
