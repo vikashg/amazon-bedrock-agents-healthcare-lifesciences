@@ -42,10 +42,7 @@ Parameters:
   GitBranch:
     Type: String
     Description: The github branch to clone 
-    Default: main
-    AllowedValues:
-      - main
-      - multi-agent-collaboratio
+    Default: multi-agent-collaboration
 
 
 Mappings:

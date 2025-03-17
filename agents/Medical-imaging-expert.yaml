@@ -15,7 +15,14 @@ Parameters:
     Type: String
     Description: The ID of the Foundation Model to use for the Agent
     Default: anthropic.claude-3-sonnet-20240229-v1:0
-  
+  DevMode:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: The flag to check if multi agent dev mode is enabled
+    
   AgentRole:
     Type: String
     Description: The arn for the agent
@@ -39,10 +46,13 @@ Mappings:
       PandasLayer: 'arn:aws:lambda:us-west-1:336392948345:layer:AWSSDKPandas-Python312:12'
     us-west-2:
       PandasLayer: 'arn:aws:lambda:us-west-2:336392948345:layer:AWSSDKPandas-Python312:12'
+Conditions:
+  CreateAgentResources: !Equals [!Ref DevMode, "false"]
 
 Resources:
   ImagingAgentResource:
     Type: AWS::Bedrock::Agent
+    Condition: CreateAgentResources
     Properties:
       AgentName: !Sub Medical-Imaging-Expert-${EnvironmentName}
       AgentResourceRoleArn: !Ref AgentRole
@@ -82,6 +92,7 @@ Resources:
   
   AgentAliasResource:
     Type: AWS::Bedrock::AgentAlias
+    Condition: CreateAgentResources
     Properties:
       AgentId: !GetAtt ImagingAgentResource.AgentId
       AgentAliasName: !Sub ImagingAgent-alias
@@ -149,6 +160,7 @@ Resources:
     
   ImagingLambdaPermission:
     Type: AWS::Lambda::Permission
+    Condition: CreateAgentResources
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt ImagingBiomarkerLambda.Arn

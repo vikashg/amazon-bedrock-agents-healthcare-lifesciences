@@ -10,6 +10,14 @@ Parameters:
   S3Bucket:
     Type: String
     Description: The S3 bucket containing the lambda function for the agent
+  
+  DevMode:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: The flag to check if multi agent dev mode is enabled
     
   BedrockModelId:
     Type: String
@@ -27,8 +35,12 @@ Parameters:
     Default: lifelines-lambda-sample
     Description: ECR repository name
 
+Conditions:
+  CreateAgentResources: !Equals [!Ref DevMode, "false"]
+
 Resources:
   StatisticianAgentResource:
+    Condition: CreateAgentResources
     Type: AWS::Bedrock::Agent
     Properties:
       AgentName: !Sub Statistician-agent-${EnvironmentName}
@@ -122,6 +134,7 @@ Resources:
   
   AgentAliasResource:
     Type: AWS::Bedrock::AgentAlias
+    Condition: CreateAgentResources 
     Properties:
       AgentId: !GetAtt StatisticianAgentResource.AgentId
       AgentAliasName: !Sub Statistician-alias
@@ -188,6 +201,7 @@ Resources:
 
   MatPlotBarChartLambdaPermission:
     Type: AWS::Lambda::Permission
+    Condition: CreateAgentResources 
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt MatPlotBarChartLambdaFunction.Arn
@@ -249,6 +263,7 @@ Resources:
   
   ScientificPlotLambdaPermission:
     Type: AWS::Lambda::Permission
+    Condition: CreateAgentResources 
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt ScientificPlotLambdaFunction.Arn

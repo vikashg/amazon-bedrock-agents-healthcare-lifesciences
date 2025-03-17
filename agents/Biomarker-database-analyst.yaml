@@ -15,12 +15,21 @@ Parameters:
     Default: anthropic.claude-3-sonnet-20240229-v1:0
   AgentRole:
     Type: String
-    Description: The arn for the agent 
-
+    Description: The arn for the agent
+  DevMode:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: The flag to check if multi agent dev mode is enabled
+Conditions:
+  CreateAgentResources: !Equals [!Ref DevMode, "false"]
 
 Resources:
   DatabaseAgentResource:
     Type: AWS::Bedrock::Agent
+    Condition: CreateAgentResources
     Properties:
       AgentName: !Sub biomarker-database-analyst-${EnvironmentName}
       AgentResourceRoleArn: !Ref AgentRole
@@ -177,6 +186,7 @@ Resources:
   
   AgentAliasResource:
     Type: AWS::Bedrock::AgentAlias
+    Condition: CreateAgentResources
     Properties:
       AgentId: !GetAtt DatabaseAgentResource.AgentId
       AgentAliasName: !Sub biomakers-alias
@@ -251,6 +261,7 @@ Resources:
                 
   AgentLambdaPermission:
     Type: AWS::Lambda::Permission
+    Condition: CreateAgentResources
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt AgentLambdaFunction.Arn

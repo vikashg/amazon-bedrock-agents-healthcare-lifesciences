@@ -9,6 +9,13 @@ Parameters:
   S3Bucket:
     Type: String
     Description: The S3 bucket containing the lambda function for the agent
+  DevMode:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: The flag to check if multi agent dev mode is enabled
   BedrockModelId:
     Type: String
     Description: The ID of the Foundation Model to use for the Agent
@@ -34,7 +41,8 @@ Mappings:
       PandasLayer: 'arn:aws:lambda:us-west-1:336392948345:layer:AWSSDKPandas-Python312:12'
     us-west-2:
       PandasLayer: 'arn:aws:lambda:us-west-2:336392948345:layer:AWSSDKPandas-Python312:12'
- 
+Conditions:
+  CreateAgentResources: !Equals [!Ref DevMode, "false"]
 Resources:
   QueryPubMedLambdaRole:
     Type: 'AWS::IAM::Role'
@@ -75,6 +83,7 @@ Resources:
 
   QueryPubMedLambdaPermission:
     Type: AWS::Lambda::Permission
+    Condition: CreateAgentResources
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !GetAtt QueryPubMedLambdaFunction.Arn
@@ -83,6 +92,7 @@ Resources:
   
   ClinicalResearchAgentResource:
     Type: AWS::Bedrock::Agent
+    Condition: CreateAgentResources
     DependsOn:
       - BedrockKnowledgeBase
       - KnowledgeBaseDataSource
@@ -162,6 +172,7 @@ Resources:
 
   AgentAliasResource:
     Type: AWS::Bedrock::AgentAlias
+    Condition: CreateAgentResources
     Properties:
       AgentId: !GetAtt ClinicalResearchAgentResource.AgentId
       AgentAliasName: ClinicalResearchAlias
