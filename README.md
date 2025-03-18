@@ -1,10 +1,50 @@
-# Accelerate analysis and discovery of cancer biomarkers with Agents for Bedrock
+# Research agents for LifeSciences with Amazon Bedrock Agents
 
-*Note: Biomarker Agents can now be deployed with Bedrock multi-agent collaboration in your AWS account!
+Explore the following components in the repository:
+## Agents catalog
+Library of specialized agents for different R&D workflows
+## Multi-agent collaboration
+Framework for agent collaboration and knowledge sharing. End to end example for cancer biomarker discovery
+## Deployment
+One-click deployment of infrastructure and interactive interface for human-agent chat
+## Evaluation
+Methods for assessing agent performance and result quality. End to end example for cancer biomarker discovery
 
-Navigate to the [multi-agent-collaboration branch](https://github.com/aws-samples/amazon-bedrock-agents-cancer-biomarker-discovery/tree/multi-agent-collaboration) of this repository and follow the instructions there to deploy the agents
 
-Read more about these agents in this article: https://aws.amazon.com/blogs/machine-learning/accelerate-analysis-and-discovery-of-cancer-biomarkers-with-amazon-bedrock-agents/
+# Multi-agent collaboration example: Accelerate analysis and discovery of cancer biomarkers with Agents for Bedrock
+
+**Note: Biomarker Agents can now be deployed with Bedrock multi-agent collaboration in your AWS account!
+
+Read more about these agents here:
+https://aws.amazon.com/blogs/machine-learning/accelerate-analysis-and-discovery-of-cancer-biomarkers-with-amazon-bedrock-agents/
+
+Multi-Agent Guidelines:
+- As of now, the primary way to deploy the Bedrock multi-agent setup is to follow the notebooks located in multi_agent_development/
+- An infrastructure deployment is needed to create AWS resources before going through the notebooks
+
+Multi-Agent Notebook Deployment Steps:
+
+Step 1: Click the 'Launch Stack' button located in the [Deployment](#deployment) section to deploy the underlying AWS infrastructure
+
+Step 2: Go to a SageMaker Notebook instance in your AWS account and clone this repository in a terminal
+
+```bash
+git clone https://github.com/aws-samples/amazon-bedrock-agents-cancer-biomarker-discovery.git
+```
+
+Step 3: Navigate to the multi-agent-collaboration branch within the repository
+```bash
+cd amazon-bedrock-agents-cancer-biomarker-discovery
+```
+```bash
+git checkout multi-agent-collaboration
+```
+
+Step 4: Navigate to agents_catalog/0-Notebook-environment/ and go to setup_environment.ipynb, use the Python 3 (ipykernel)
+
+Step 5: Proceed to build each agent using the notebooks
+
+Step 6: If you are interested in deploying the Biomarker Supervisor Agent that leverages the Bedrock multi-agent collaboration feature, go to the multi_agent_orchestration/ folder of this repository and follow instructions there
 
 ## Overview
 The success rate for Phase I oncology clinical trials is significantly low. According to a study published in Nature Reviews Drug Discovery, the overall success rate for oncology drugs from Phase I to approval is around 5%, indicating a high failure rate of approximately 95%. 
@@ -121,7 +161,7 @@ Here is an example chain of thought sequence with the agent. 11 questions are li
 4. Access the UI:
    1. Navigate to AWS CloudFormation via AWS Console search
    2. Click the Streamlit nested stack (format: `<stackname>-StreamlitBuildNestedStack-<123ABCXXXX>`)
-   3. In the Outputs tab, find and click the StreamlitAppURL link
+   3. In the Outputs tab, find the CloudFrontURL link and add 'https://' to the beginning of the URL and paste in your browser
 
 
 ## Contributing Guidelines
