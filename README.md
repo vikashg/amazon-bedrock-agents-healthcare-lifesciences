@@ -2,11 +2,11 @@
 
 Explore the following components in the repository:
 ## Agents catalog
-Library of specialized agents for different R&D workflows
+Library of specialized agents for different R&D workflows [agent-catalog](agents_catalog/)
 ## Multi-agent collaboration
-Framework for agent collaboration and knowledge sharing. End to end example for cancer biomarker discovery
+Framework for agent collaboration and knowledge sharing. End to end example for cancer biomarker discovery [multi-agent](multi_agent_collaboration/cancer_biomarker_discovery/README.md)
 ## Evaluation
-Methods for assessing agent performance and result quality. End to end example for cancer biomarker discovery
+Methods for assessing agent performance and result quality. End to end example for cancer biomarker discovery [evaluations](evaluations/README.md)
 
 ## Accelerate analysis and discovery of cancer biomarkers with Agents for Bedrock
 Read more about these agents here:
@@ -82,7 +82,7 @@ The multi-agent solution overview is illustrated below.
 4. For testing purposes, deploy the `infra_cfn.yaml` template to AWS CloudFormation.
 
 ### Submitting a Pull Request
-**Follow the guidelines to contribute a new agent to the catalog here: [add-a-new-agent] (https://aws-samples.github.io/amazon-bedrock-agents-healthcare-lifesciences/guides/)
+**Follow the guidelines to contribute a new agent to the catalog here: [add-a-new-agent](https://aws-samples.github.io/amazon-bedrock-agents-healthcare-lifesciences/guides/)
 
 1. Ensure you have forked the main repository: [amazon-bedrock-agents-healthcare-lifesciences](https://github.com/aws-samples/amazon-bedrock-agents-healthcare-lifesciences/tree/main)
 
