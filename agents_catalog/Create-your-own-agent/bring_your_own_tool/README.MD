@@ -5,7 +5,6 @@ Bring your tools to Bedrock Agents
 ## Examples Overview 
 1. [Create Agents with Function Definition](https://github.com/aws-samples/amazon-bedrock-samples/tree/main/agents-and-function-calling/bedrock-agents/features-examples/01-create-agent-with-function-definition)
 2. [Create Agents with API Schema](https://github.com/aws-samples/amazon-bedrock-samples/tree/main/agents-and-function-calling/bedrock-agents/features-examples/02-create-agent-with-api-schema)
-3. [Create Agents with a tool for your specialized model]
 
 ## Create Agents with a tool for your specialized model
 
