@@ -1,6 +1,7 @@
 # This Repository showcases how to build an AI Agent to support Pathology workflows
 
 This repository showcases how to create an agent using Amazon Bedrock to support Pathology use-cases. The Agent has two capabilities:
+
 * Retrieve existing pathology reports and extract information from the parsed PDFs
 * Augment existing pathology reports findings using biomarker task-specific fine-tuned ML models
 
@@ -18,6 +19,19 @@ Deploy the cloud formation template. Make sure to use your `AWS PROFILE` and you
 
 Note: This CloudFormation template triggers a CodeBuild that takes approximately 20 minutes to build. You can check on the progress of that build in the AWS CodeBuild Console before moving to the next step. 
 
+# Step 2 - Deploy the Agent
 
+Follow the `create_agent.ipynb` protocol to deploy your agent
+
+# Step 3 - Test your agent. 
+
+**Sample Questions:**:
+
+```
+    1. What is the pathology report of patient "TCGA-3L"?
+    2. Was the MSI status mentioned in the report of patient "TCGA-4N"?
+    3. Can you run the MSI classification for patient "TCHA-5M"?
+    4. What is the status of the job classification? 
+```
 
 
