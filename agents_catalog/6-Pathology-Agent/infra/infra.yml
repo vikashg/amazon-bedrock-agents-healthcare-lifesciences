@@ -199,11 +199,17 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub ${AWS::StackName}-${AWS::AccountId}-Lambda
-      Handler: lambda_function.lambda_handler
+      Handler: index.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Code:
-        S3Bucket: !Sub ${ArtifactsBucket}
-        S3Key: lambda_code.zip
+        ZipFile: |
+          def lambda_handler(event, context):
+              # This is a place holder function that gets overwritten when creating the Agent
+              print("Hello World")
+              return {
+                  'statusCode': 200,
+                  'body': 'Hello World'
+              }
       Runtime: python3.11
       Timeout: 300
       MemorySize: 256

@@ -267,5 +267,5 @@ if __name__ == "__main__":
         ],
         "messageVersion": "1.0"
     }
-    print(check_on_aws_batch_job_status("c8982f65-5cc6-4bbc-a78d-9c57ed722bf6"))
+    print(check_on_aws_batch_job_status("jobID"))
     
