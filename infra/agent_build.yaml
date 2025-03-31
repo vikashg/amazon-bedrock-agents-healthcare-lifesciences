@@ -81,8 +81,6 @@ Resources:
   BiomarkerAnalystAgent:
     Type: AWS::CloudFormation::Stack
     Condition: AutoCreateAgents
-    DependsOn: 
-      - EnsureECRImagePushed
     Properties:
       TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_Biomarker-database-analyst.yaml
       Parameters:
@@ -101,8 +99,6 @@ Resources:
   MedicalImagingExpertAgent:
     Type: AWS::CloudFormation::Stack
     Condition: AutoCreateAgents
-    DependsOn: 
-      - EnsureImagingDockerImagePushed
     Properties:
       TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_Medical-imaging-expert.yaml
       Parameters:
