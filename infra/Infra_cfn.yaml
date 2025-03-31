@@ -1141,11 +1141,11 @@ Resources:
                 - echo Cloning the repository
                 - git clone -b $GIT_BRANCH --single-branch $GITHUB_LINK repo
                 - cd repo
-                - chmod +x build_agents.sh
+                - chmod +x infra/build_agents.sh
             build:
               commands:
                 - echo Processing agent templates
-                - ./build_agents.sh
+                - ./infra/build_agents.sh
             post_build:
               commands:
                 - echo Build completed on `date`
