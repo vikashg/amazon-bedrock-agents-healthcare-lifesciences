@@ -66,16 +66,202 @@ Conditions:
   AutoCreateAgents: !Equals [!Ref MultiAgentDevMode, "False"]
 
 Resources:
-  # ECR Repositories
-  LifelinesECRRepository:
-    Type: AWS::ECR::Repository
+  # S3 Bucket for storing agent artifacts
+  S3Bucket: 
+    Type: AWS::S3::Bucket
     Properties:
-      RepositoryName: lifelines-lambda-sample
+      BucketName: !Sub '${EnvironmentName}-${AWS::AccountId}-${AWS::Region}-agent-build-bucket'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LoggingConfiguration:
+        DestinationBucketName: !Ref LogBucket
+        LogFilePrefix: 'access-logs/'
 
-  ImagingECRRepository:
-    Type: AWS::ECR::Repository
+  # Log bucket for S3 access logs
+  LogBucket:
+    Type: AWS::S3::Bucket
     Properties:
-      RepositoryName: medical-image-processing-smstudio
+      BucketName: !Sub '${EnvironmentName}-${AWS::AccountId}-${AWS::Region}-log-bucket'
+  
+  LogBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LogBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowLogDeliveryWrite
+            Effect: Allow
+            Principal:
+              Service: logging.s3.amazonaws.com
+            Action:
+              - s3:PutObject
+            Resource: !Sub '${LogBucket.Arn}/*'
+
+  # Forces SSL/TLS encryption for all S3 operations on the S3 Bucket
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ForceSSLOnlyAccess
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: 
+              - !Sub '${S3Bucket.Arn}'
+              - !Sub '${S3Bucket.Arn}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': false
+          - Sid: AllowCloudFormationAccess
+            Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Sub '${S3Bucket.Arn}'
+              - !Sub '${S3Bucket.Arn}/*'
+
+  # Step Functions State Machine for Medical Imaging
+  ImagingStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      RoleArn: !GetAtt StepFunctionsExecutionRole.Arn
+      DefinitionString: !Sub
+        - |
+          {
+            "StartAt": "iterate_over_subjects",
+            "States": {
+              "iterate_over_subjects": {
+                "ItemsPath": "$.Subject",
+                "MaxConcurrency": 50,
+                "Type": "Map",
+                "Next": "Finish",
+                "Iterator": {
+                  "StartAt": "DICOM/NIfTI Conversion and Radiomic Feature Extraction",
+                  "States": {
+                    "Fallback": {
+                      "Type": "Pass",
+                      "Result": "This iteration failed for some reason",
+                      "End": true
+                    },
+                    "DICOM/NIfTI Conversion and Radiomic Feature Extraction": {
+                      "Type": "Task",
+                      "OutputPath": "$.ProcessingJobArn",
+                      "Resource": "arn:aws:states:::sagemaker:createProcessingJob.sync",
+                      "Retry": [
+                        {
+                          "ErrorEquals": [
+                            "SageMaker.AmazonSageMakerException"
+                          ],
+                          "IntervalSeconds": 15,
+                          "MaxAttempts": 8,
+                          "BackoffRate": 1.5
+                        }
+                      ],
+                      "Catch": [
+                        {
+                          "ErrorEquals": [
+                            "States.TaskFailed"
+                          ],
+                          "Next": "Fallback"
+                        }
+                      ],
+                      "Parameters": {
+                        "ProcessingJobName.$": "States.Format('{}-{}', $$.Execution.Input['PreprocessingJobName'], $)",
+                        "ProcessingInputs": [
+                          {
+                            "InputName": "DICOM",
+                            "AppManaged": false,
+                            "S3Input": {
+                              "S3Uri.$": "States.Format('s3://sagemaker-solutions-prod-${AWS::Region}/sagemaker-lung-cancer-survival-prediction/1.1.0/data/nsclc_radiogenomics/{}' , $)", 
+                              "LocalPath": "/opt/ml/processing/input",
+                              "S3DataType": "S3Prefix",
+                              "S3InputMode": "File",
+                              "S3DataDistributionType": "FullyReplicated",
+                              "S3CompressionType": "None"
+                            }
+                          }
+                        ],
+                        "ProcessingOutputConfig": {
+                          "Outputs": [
+                            {
+                              "OutputName": "CT-Nifti",
+                              "AppManaged": false,
+                              "S3Output": {
+                                "S3Uri": "${S3Bucket}/nsclc_radiogenomics/CT-Nifti",
+                                "LocalPath": "/opt/ml/processing/output/CT-Nifti",
+                                "S3UploadMode": "EndOfJob"
+                              }
+                            },
+                            {
+                              "OutputName": "CT-SEG",
+                              "AppManaged": false,
+                              "S3Output": {
+                                "S3Uri": "${S3Bucket}/nsclc_radiogenomics/CT-SEG",
+                                "LocalPath": "/opt/ml/processing/output/CT-SEG",
+                                "S3UploadMode": "EndOfJob"
+                              }
+                            },
+                            {
+                              "OutputName": "PNG",
+                              "AppManaged": false,
+                              "S3Output": {
+                                "S3Uri": "${S3Bucket}/nsclc_radiogenomics/PNG",
+                                "LocalPath": "/opt/ml/processing/output/PNG",
+                                "S3UploadMode": "EndOfJob"
+                              }
+                            },
+                            {
+                              "OutputName": "CSV",
+                              "AppManaged": false,
+                              "S3Output": {
+                                "S3Uri": "${S3Bucket}/nsclc_radiogenomics/CSV",
+                                "LocalPath": "/opt/ml/processing/output/CSV",
+                                "S3UploadMode": "EndOfJob"
+                              }
+                            }
+                          ]
+                        },
+                        "AppSpecification": {
+                          "ImageUri": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ImagingECRRepository}:${ImageTag}",
+                          "ContainerArguments.$": "States.Array('--subject', $)",
+                          "ContainerEntrypoint": [
+                            "python3",
+                            "/opt/dcm2nifti_processing.py"
+                          ]
+                        },
+                        "RoleArn": "${SageMakerExecutionRoleArn}",
+                        "ProcessingResources": {
+                          "ClusterConfig": {
+                            "InstanceCount": 1,
+                            "InstanceType": "ml.m5.xlarge",
+                            "VolumeSizeInGB": 5
+                          }
+                        }
+                      },
+                      "End": true
+                    }
+                  }
+                }
+              },
+              "Finish": {
+                "Type": "Succeed"
+              }
+            }
+          }
+
+        - {
+            S3Bucket: !Sub "s3://${S3Bucket}",
+            SageMakerExecutionRoleArn: !GetAtt SageMakerExecutionRole.Arn
+          }
 
   # Agent Stacks - Direct nested stack approach
   BiomarkerAnalystAgent:
@@ -86,6 +272,8 @@ Resources:
       Parameters:
         BedrockModelId: !Ref BedrockModelId
         EnvironmentName: !Ref EnvironmentName
+        S3Bucket: !Ref S3Bucket
+        AgentRole: !GetAtt AgentRole.Arn
 
   ClinicalEvidenceResearcherAgent:
     Type: AWS::CloudFormation::Stack
@@ -95,6 +283,8 @@ Resources:
       Parameters:
         BedrockModelId: !Ref BedrockModelId
         EnvironmentName: !Ref EnvironmentName
+        S3Bucket: !Ref S3Bucket
+        AgentRole: !GetAtt AgentRole.Arn
 
   MedicalImagingExpertAgent:
     Type: AWS::CloudFormation::Stack
@@ -104,6 +294,10 @@ Resources:
       Parameters:
         BedrockModelId: !Ref BedrockModelId
         EnvironmentName: !Ref EnvironmentName
+        S3Bucket: !Ref S3Bucket
+        AgentRole: !GetAtt AgentRole.Arn
+        ImagingStateMachineName: !Ref ImagingStateMachine
+        ImagingStateMachineArn: !GetAtt ImagingStateMachine.Arn
 
   StatisticianAgent:
     Type: AWS::CloudFormation::Stack
@@ -113,6 +307,8 @@ Resources:
       Parameters:
         BedrockModelId: !Ref BedrockModelId
         EnvironmentName: !Ref EnvironmentName
+        S3Bucket: !Ref S3Bucket
+        AgentRole: !GetAtt AgentRole.Arn
 
   BiologicalPathwaysAgent:
     Type: AWS::CloudFormation::Stack
@@ -122,6 +318,9 @@ Resources:
       Parameters:
         BedrockModelId: !Ref BedrockModelId
         EnvironmentName: !Ref EnvironmentName
+        S3Bucket: !Ref S3Bucket
+        AgentRole: !GetAtt AgentRole.Arn
+        VectorStoreName: !Ref VectorStoreName
 
   SupervisorAgent:
     Type: AWS::CloudFormation::Stack
@@ -137,6 +336,8 @@ Resources:
       Parameters:
         BedrockModelId: !Ref BedrockModelId
         EnvironmentName: !Ref EnvironmentName
+        S3Bucket: !Ref S3Bucket
+        AgentRole: !GetAtt AgentRole.Arn
         BiomarkerAnalystAgentId: !GetAtt BiomarkerAnalystAgent.Outputs.AgentId
         ClinicalEvidenceResearcherAgentId: !GetAtt ClinicalEvidenceResearcherAgent.Outputs.AgentId
         MedicalImagingExpertAgentId: !GetAtt MedicalImagingExpertAgent.Outputs.AgentId
@@ -178,3 +379,170 @@ Outputs:
     Condition: AutoCreateAgents
     Description: ID of the deployed Supervisor Agent
     Value: !GetAtt SupervisorAgent.Outputs.AgentId
+  # ECR Repositories
+  LifelinesECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: lifelines-lambda-sample
+
+  ImagingECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: medical-image-processing-smstudio
+  # IAM Roles for Step Functions and SageMaker
+  StepFunctionsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StepFunctionsExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # SageMaker permissions
+              - Effect: Allow
+                Action:
+                  - 'sagemaker:CreateProcessingJob'
+                  - 'sagemaker:DescribeProcessingJob'
+                  - 'sagemaker:StopProcessingJob'
+                  - 'sagemaker:ListTags'
+                  - 'sagemaker:AddTags'
+                Resource: !Sub 'arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:processing-job/dcm-nifti-*'
+              # IAM permissions
+              - Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource: !GetAtt SageMakerExecutionRole.Arn
+              # Step Functions Map state permissions
+              - Effect: Allow
+                Action:
+                  - 'events:PutTargets'
+                  - 'events:PutRule'
+                  - 'events:DescribeRule'
+                  - 'events:DeleteRule'
+                  - 'events:DisableRule'
+                  - 'events:EnableRule'
+                  - 'events:RemoveTargets'
+                Resource:
+                  - !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/StepFunctions-Map-*'
+                  - !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/StepFunctions-*'
+              # States permissions for Map state
+              - Effect: Allow
+                Action:
+                  - 'states:StartExecution'
+                  - 'states:StopExecution'
+                  - 'states:DescribeExecution'
+                  - 'states:CreateStateMachine'
+                  - 'states:DeleteStateMachine'
+                  - 'states:UpdateStateMachine'
+                  - 'states:DescribeStateMachine'
+                  - 'states:DescribeStateMachineForExecution'
+                  - 'states:ListExecutions'
+                Resource: 
+                  - !Sub 'arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:*'
+                  - !Sub 'arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:*:*'
+              # CloudWatch Logs permissions
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogDelivery'
+                  - 'logs:GetLogDelivery'
+                  - 'logs:UpdateLogDelivery'
+                  - 'logs:DeleteLogDelivery'
+                  - 'logs:ListLogDeliveries'
+                  - 'logs:PutLogEvents'
+                  - 'logs:PutResourcePolicy'
+                  - 'logs:DescribeResourcePolicies'
+                  - 'logs:DescribeLogGroups'
+                Resource: 
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+              - Effect: Allow
+                Action:
+                  - 'lambda:InvokeFunction'
+                Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*'
+        - PolicyName: EventsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'events:PutTargets'
+                  - 'events:PutRule'
+                  - 'events:DescribeRule'
+                Resource:
+                  - !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/*'
+
+  SageMakerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sagemaker.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SageMakerProcessingAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Processing Job Permissions
+              - Effect: Allow
+                Action:
+                  - 'sagemaker:CreateProcessingJob'
+                  - 'sagemaker:DescribeProcessingJob'
+                  - 'sagemaker:StopProcessingJob'
+                  - 'sagemaker:ListProcessingJobs'
+                Resource: !Sub 'arn:aws:sagemaker:${AWS::Region}:${AWS::AccountId}:processing-job/*'
+              # ECR Access for Container
+              - Effect: Allow
+                Action:
+                  - 'ecr:GetAuthorizationToken'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ecr:BatchCheckLayerAvailability'
+                  - 'ecr:GetDownloadUrlForLayer'
+                  - 'ecr:BatchGetImage'
+                Resource: 
+                  - !Sub 'arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${ImagingECRRepository}'
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Input data access
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                Resource:
+                  - 'arn:aws:s3:::sagemaker-solutions-prod-*'
+                  - 'arn:aws:s3:::sagemaker-solutions-prod-*/sagemaker-lung-cancer-survival-prediction/*'
+              # Output data access
+              - Effect: Allow
+                Action:
+                  - 's3:PutObject'
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                Resource: 
+                  - !Sub 'arn:aws:s3:::${S3Bucket}'
+                  - !Sub 'arn:aws:s3:::${S3Bucket}/nsclc_radiogenomics/*'
+        - PolicyName: CloudWatchLogsAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                  - 'logs:DescribeLogStreams'
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/sagemaker/ProcessingJobs:*'
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/sagemaker/ProcessingJobs:log-stream:*'
