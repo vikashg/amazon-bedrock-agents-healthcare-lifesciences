@@ -1,0 +1,156 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creates Bedrock Agents for cancer biomarker discovery
+
+Parameters:
+  BedrockModelId:
+    Type: String
+    Description: The ID of the Foundation Model to use for the Agent
+    Default: us.anthropic.claude-3-5-sonnet-20241022-v2:0
+  
+  EnvironmentName:
+    Type: String
+    Description: The name of the agent environment, used to differentiate agent application. Must be lowercase, contain one number, and be no more than 5 characters long.
+    Default: env1
+    MaxLength: 5
+    AllowedPattern: ^[a-z]{1,4}[0-9]$
+    ConstraintDescription: Must be lowercase, contain one number at the end, and be no more than 5 characters long.
+  
+  MultiAgentDevMode:
+    Type: String
+    Description: Select True to use a python notebook to manually create the agents step by step. Select false to auto create all agents. 
+    AllowedValues: 
+      - True
+      - False
+  
+  GitRepoURL:
+    Type: String
+    Default: 'https://github.com/aws-samples/amazon-bedrock-agents-cancer-biomarker-discovery.git'
+    Description: Git repository URL where the code files are stored
+  
+  ImageTag:
+    Type: String
+    Default: latest
+    Description: Tag for the Docker image
+  
+  VectorStoreName:
+    Type: String
+    Default: nmcicollection
+    Description: Name of the vector store/collection
+  
+  IndexName:
+    Type: String
+    Default: vector-index
+    Description: Name of the vector index to be created
+  
+  GitBranch:
+    Type: String
+    Description: The github branch to clone
+    Default: main
+  
+  SubAgentS3Bucket:
+    Type: String
+    Description: 'The S3 bucket containing the Subagents'
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      PandasLayer: 'arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python312:12'
+    us-east-2:
+      PandasLayer: 'arn:aws:lambda:us-east-2:336392948345:layer:AWSSDKPandas-Python312:12'
+    us-west-1:
+      PandasLayer: 'arn:aws:lambda:us-west-1:336392948345:layer:AWSSDKPandas-Python312:12'
+    us-west-2:
+      PandasLayer: 'arn:aws:lambda:us-west-2:336392948345:layer:AWSSDKPandas-Python312:12'
+
+Conditions:
+  AutoCreateAgents: !Equals [!Ref MultiAgentDevMode, "false"]
+
+Resources:
+  # ECR Repositories
+  LifelinesECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: lifelines-lambda-sample
+
+  ImagingECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: medical-image-processing-smstudio
+
+  # Agent Stacks
+  BiomarkerAnalystAgent:
+    Type: AWS::CloudFormation::Stack
+    Condition: AutoCreateAgents
+    DependsOn: 
+      - EnsureECRImagePushed
+    Properties:
+      TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_Biomarker-database-analyst.yaml
+      Parameters:
+        BedrockModelId: !Ref BedrockModelId
+        EnvironmentName: !Ref EnvironmentName
+
+  ClinicalEvidenceResearcherAgent:
+    Type: AWS::CloudFormation::Stack
+    Condition: AutoCreateAgents
+    Properties:
+      TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_Clinical-evidence-researcher.yaml
+      Parameters:
+        BedrockModelId: !Ref BedrockModelId
+        EnvironmentName: !Ref EnvironmentName
+
+  MedicalImagingExpertAgent:
+    Type: AWS::CloudFormation::Stack
+    Condition: AutoCreateAgents
+    DependsOn: 
+      - EnsureImagingDockerImagePushed
+    Properties:
+      TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_Medical-imaging-expert.yaml
+      Parameters:
+        BedrockModelId: !Ref BedrockModelId
+        EnvironmentName: !Ref EnvironmentName
+
+  StatisticianAgent:
+    Type: AWS::CloudFormation::Stack
+    Condition: AutoCreateAgents
+    Properties:
+      TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_Statistician.yaml
+      Parameters:
+        BedrockModelId: !Ref BedrockModelId
+        EnvironmentName: !Ref EnvironmentName
+
+  BiologicalPathwaysAgent:
+    Type: AWS::CloudFormation::Stack
+    Condition: AutoCreateAgents
+    Properties:
+      TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_Biological-pathways-analyst.yaml
+      Parameters:
+        BedrockModelId: !Ref BedrockModelId
+        EnvironmentName: !Ref EnvironmentName
+
+  SupervisorAgent:
+    Type: AWS::CloudFormation::Stack
+    Condition: AutoCreateAgents
+    DependsOn:
+      - BiomarkerAnalystAgent
+      - ClinicalEvidenceResearcherAgent
+      - MedicalImagingExpertAgent
+      - StatisticianAgent
+    Properties:
+      TemplateURL: !Sub https://${SubAgentS3Bucket}.s3.${AWS::Region}.amazonaws.com/packaged_supervisor_agent.yaml
+      Parameters:
+        BedrockModelId: !Ref BedrockModelId
+        EnvironmentName: !Ref EnvironmentName
+        BiomarkerAnalystAgentId: !GetAtt BiomarkerAnalystAgent.Outputs.AgentId
+        ClinicalEvidenceResearcherAgentId: !GetAtt ClinicalEvidenceResearcherAgent.Outputs.AgentId
+        MedicalImagingExpertAgentId: !GetAtt MedicalImagingExpertAgent.Outputs.AgentId
+        StatisticianAgentId: !GetAtt StatisticianAgent.Outputs.AgentId
+
+  # TBD
+  # Include the rest of your existing resources (Docker containers, CleanupLambdaFunction, roles, etc.)
+  # [Previous CleanupLambdaFunction and other resources remain unchanged]
+
+Outputs:
+  SupervisorAgentId:
+    Condition: AutoCreateAgents
+    Description: ID of the deployed Supervisor Agent
+    Value: !GetAtt SupervisorAgent.Outputs.AgentId

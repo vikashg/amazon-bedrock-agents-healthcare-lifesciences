@@ -23,7 +23,7 @@ The multi-agent solution overview is illustrated below.
 > Access to Amazon Bedrock foundation models (not granted by default). To gain access, follow the [official documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html).
 
 
-1. Upload the `Infra_cfn.yaml` file from the [amazon-bedrock-agents-cancer-biomarker-discovery](https://github.com/aws-samples/amazon-bedrock-agents-cancer-biomarker-discovery) repository to AWS CloudFormation. This template will set up:
+1. Upload the `infra/Infra_cfn.yaml` file from the [amazon-bedrock-agents-cancer-biomarker-discovery](https://github.com/aws-samples/amazon-bedrock-agents-cancer-biomarker-discovery) repository to AWS CloudFormation. This template will set up:
 > [!WARNING]  
 > Launching this stack will create 2 VPCs (Infrastructure and UI).
 
@@ -75,11 +75,11 @@ The multi-agent solution overview is illustrated below.
 2. Clone your forked repository to your local machine.
 
 3. Update the GitHub URL in the following configuration files to point to your forked repository:
-   - `infra_cfn.yaml`
-   - `agent_build.yaml`
-   - `streamlit_build.yaml`
+   - `infra/Infra_cfn.yaml`
+   - `infra/agent_build.yaml`
+   - `streamlitapp/streamlit_build.yaml`
 
-4. For testing purposes, deploy the `infra_cfn.yaml` template to AWS CloudFormation.
+4. For testing purposes, deploy the `infra/Infra_cfn.yaml` template to AWS CloudFormation.
 
 ### Submitting a Pull Request
 **Follow the guidelines to contribute a new agent to the catalog here: [add-a-new-agent](https://aws-samples.github.io/amazon-bedrock-agents-healthcare-lifesciences/guides/)
