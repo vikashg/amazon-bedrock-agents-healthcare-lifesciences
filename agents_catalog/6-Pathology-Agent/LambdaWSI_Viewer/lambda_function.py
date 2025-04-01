@@ -71,7 +71,7 @@ def lambda_handler(event, context):
     bucket_name = os.environ['BUCKET_NAME']
     
     # Generate output filename
-    output_filename = os.path.splitext(os.path.basename(wsi_path))[0] + "_downsampled.png"
+    output_filename = 'PNG/'+os.path.splitext(os.path.basename(wsi_path))[0] + "_downsampled.png"
     
     # Create a temporary directory to store files
     with tempfile.TemporaryDirectory() as temp_dir:
