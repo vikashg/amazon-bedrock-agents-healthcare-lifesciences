@@ -12,6 +12,7 @@ MODEL_ID = os.environ.get('MODEL_ID', 'anthropic.claude-3-sonnet-20240229-v1:0')
 BATCH_JOB_QUEUE = os.environ.get('BATCH_JOB_QUEUE')
 BATCH_JOB_DEFINITION_FEATURE_EXTRACTION = os.environ.get('BATCH_JOB_DEFINITION_FEATURE_EXTRACTION')
 BATCH_JOB_DEFINITION_CLASSIFIER = os.environ.get('BATCH_JOB_DEFINITION_CLASSIFIER')
+LAMBDA_VIEWER_FUNCTION_NAME = os.environ.get('LAMBDA_VIEWER_FUNCTION_NAME')
 
 # Bedrock configuration
 BEDROCK_CONFIG = Config(connect_timeout=120, read_timeout=120, retries={'max_attempts': 0})
@@ -164,6 +165,30 @@ def check_on_executed_ml_models(patient_id):
     preexisting_features_key = get_s3_object(f"FEATURES/{patient_id}")
     if not preexisting_features_key:
         return create_response(200, {'error': f'No Features found for patient_id: {patient_id}, please extract features first !'})
+    
+def invoke_wsi_viewer_lambda(s3_uri_path):
+    """
+    Invokes the WSI Viewer Lambda function with the provided S3 URI path
+    """
+    # Initialize Lambda client
+    lambda_client = boto3.client('lambda', region_name='us-west-2')
+    # Prepare the event payload
+    event = {
+        "wsi_path": s3_uri_path
+    }
+
+    # Invoke Lambda function
+    response = lambda_client.invoke(
+        FunctionName=LAMBDA_VIEWER_FUNCTION_NAME,
+        InvocationType='RequestResponse',  # Synchronous execution
+        Payload=json.dumps(event)
+    )
+    
+    # Parse the response
+    response_payload = json.loads(response['Payload'].read())
+    
+    return response_payload
+        
 
 def lambda_handler(event, context):
     actionGroup = event['actionGroup']
@@ -240,6 +265,21 @@ def lambda_handler(event, context):
                 "body": str(json.dumps(prexisting_jobs_results))
             }
         }
+    elif function == 'visualize_wsi_image':
+        patient_id = None
+        for param in parameters:
+            if param["name"] == "patient_id":
+                patient_id = param["value"]
+
+        wsi_key_path = get_s3_object(f"WSI/{patient_id}")
+        wsi_path = f"s3://{BUCKET_NAME}/{wsi_key_path}"
+        wsi_viewer_response = invoke_wsi_viewer_lambda(wsi_path)
+        
+        responseBody =  {
+            'TEXT': {
+                "body": str(json.dumps(wsi_viewer_response))
+            }
+        }
 
     action_response = {
         'actionGroup': actionGroup,
@@ -261,11 +301,12 @@ if __name__ == "__main__":
     os.environ['AWS_PROFILE'] = 'pidemal-hcls'
     event = {
         "actionGroup": "actionGroup",
-        "function": "retrieve_existing_pathology_report",
+        "function": "visualize_wsi_image",
         "parameters": [
             {"name": "patient_id", "value": "TCGA-3L"}
         ],
         "messageVersion": "1.0"
     }
-    print(check_on_aws_batch_job_status("jobID"))
+
+    print(lambda_handler(event, None))
     

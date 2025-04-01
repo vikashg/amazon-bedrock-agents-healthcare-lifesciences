@@ -32,6 +32,12 @@ Follow the `create_agent.ipynb` protocol to deploy your agent
     2. Was the MSI status mentioned in the report of patient "TCGA-4N"?
     3. Can you run the MSI classification for patient "TCHA-5M"?
     4. What is the status of the job classification? 
+    5. What does the WSI image for patient "TCGA-5M" look like?
 ```
+
+
+# LICENSE
+
+The codebase relies on external models such as [H-Optimus-0](https://huggingface.co/bioptimus/H-optimus-0) and the [Trident](https://github.com/mahmoodlab/TRIDENT) inference framework subject to different Licensing Agreements. The data being used comes from the TCGA Data licensing can be found [here](https://registry.opendata.aws/tcga/)
 
 

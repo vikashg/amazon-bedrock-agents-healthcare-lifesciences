@@ -88,4 +88,4 @@ WSI_SLIDES=(
 ## Copy code artifacts
 aws s3 cp FeatureExtractionContainer s3://$TARGET_BUCKET/docker/feature-extraction --recursive --profile "$AWS_PROFILE"
 aws s3 cp MSIClassificationContainer s3://$TARGET_BUCKET/docker/msi-classification --recursive --profile "$AWS_PROFILE"
-cd LambdaDocumentParsing && zip lambda_code.zip lambda_function.py && aws s3 cp lambda_code.zip s3://$TARGET_BUCKET/lambda_code.zip --profile "$AWS_PROFILE"
+aws s3 cp LambdaWSI_Viewer s3://$TARGET_BUCKET/docker/lambda-wsi-viewer --recursive --profile "$AWS_PROFILE"
