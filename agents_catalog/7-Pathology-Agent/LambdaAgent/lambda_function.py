@@ -265,7 +265,7 @@ def lambda_handler(event, context):
                 "body": str(json.dumps(prexisting_jobs_results))
             }
         }
-    elif function == 'visualize_wsi_image':
+    elif function == 'invoke_wsi_viewer_lambda':
         patient_id = None
         for param in parameters:
             if param["name"] == "patient_id":
