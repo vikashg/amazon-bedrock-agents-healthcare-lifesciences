@@ -86,10 +86,11 @@ def lambda_handler(event, context):
         # Upload the file to S3
         s3_client = boto3.client('s3')
         s3_client.upload_file(temp_output_path, bucket_name, output_filename)
+        print(f"File {output_filename} uploaded !")
         
         # Generate a presigned URL
         presigned_url = generate_presigned_url(bucket_name, output_filename)
-        
+        print(f"Presigned URL: {presigned_url}")
         return {
             'statusCode': 200,
             'body': {
