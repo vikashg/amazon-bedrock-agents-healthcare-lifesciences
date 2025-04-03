@@ -1,6 +1,16 @@
 # Biomarker Multi-Agent Evaluation
 
-This folder provides resources needed to evaluate the Biomarker Supervisor Agent against the [Bedrock Agent Evaluation Framework](https://github.com/aws-samples/amazon-bedrock-agent-evaluation-framework/tree/main). 
+This folder provides resources needed to evaluate the Biomarker Supervisor Agent against the [Bedrock Agent Evaluation Framework](https://github.com/aws-samples/amazon-bedrock-agent-evaluation-framework/tree/main).
+
+The framework has the following features: 
+* Evaluate Bedrock Agent on its capabilities (RAG, Text-to-SQL, Custom tool use) and overall Chain-of-Thought
+* Comprehensive evaluation results and trace data sent to Langfuse with built-in visual dashboards
+* Supports trace parsing and evaluations for various Bedrock Agent configuration options
+
+It addresses the following technical challenges:
+* Unavailability of End-to-End Agent Evaluation
+* Challenging Experiment Management
+* Lack of Agent Observability
 
 ![HCLS Agent Evaluation](img/hcls_evaluation.png)
 
