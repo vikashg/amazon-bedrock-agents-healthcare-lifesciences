@@ -41,14 +41,15 @@ def lambda_handler(event, context):
         "TEXT": { "body": "Error, Function call didn't happen"}
     }
     print("Parameters: ", parameters)
+    print('Function: ', function)
     if function == 'run_validator':
-        response_body = run_validator(parameters[0]["pat_report"])
+        responseBody = run_validator(parameters[0]["pat_report"])
 
 
     action_response = {
         "actionGroup": actionGroup,
         "function": function,
-        "functionResponse": {"responseBody": response_body} }
+        "functionResponse": {"responseBody": responseBody} }
 
     function_response = {'response': action_response, "messageVersion": event["messageVersion"]}
     return function_response
