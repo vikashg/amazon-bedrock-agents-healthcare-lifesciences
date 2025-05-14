@@ -24,30 +24,6 @@ bedrock_agent_client = boto3.client("bedrock-runtime", region_name=REGION, confi
 batch_client = boto3.client('batch')
 
 
-def get_radiology_report(pat_id):
-    """
-    The function gets the radiology report from a dynaboDB table
-    and returns the report. The report is in the text format.
-
-    Args:
-        key (_type_): _description_
-    """
-    from boto3.dynamodb.conditions import Key
-    dynamodb_client = boto3.client('dynamodb')
-    dynamodb_table_name = "RadiologyReportDB"
-    dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table(dynamodb_table_name)
-    print("Patient ID: ", pat_id)
-
-    try:
-        response = table.query(KeyConditionExpression=Key('PatientId').eq(str(pat_id)))
-        report = response['Items'][0]['Report']
-    except Exception as e:
-        print("Patient ID not found in DynamoDB: ")
-        report = None
-
-    return report
-
 
 def download_guidance_document(anatomical_structure):
     """The function downloads the appropriate documents from the S3 bucket
@@ -59,7 +35,8 @@ def download_guidance_document(anatomical_structure):
     import os
     # Get list of all files in the S3 bucket
     s3 = boto3.client('s3')
-    bucket_name = "radiologyreport-validator"
+    # bucket_name = "radiologyreport-validator"
+    bucket_name = "data-for-report-validation"
     response = s3.list_objects_v2(Bucket=bucket_name)
     files = [obj['Key'] for obj in response['Contents']]
 
@@ -127,7 +104,8 @@ def run_validator(text):
         }
         ]
         inf_params = {"maxTokens": 200, "topP": 0.1, "temperature": 0.3}
-        model_response = bedrock_agent_client.converse(modelId=MODEL_ID, messages=messages, inferenceConfig=inf_params)
+        model_id = 'amazon.nova-micro-v1:0'
+        model_response = bedrock_agent_client.converse(modelId=model_id, messages=messages, inferenceConfig=inf_params)
         response_text = model_response['output']['message']['content'][0]['text']
         print("***************Tested***************")
         return response_text
@@ -145,8 +123,9 @@ def lambda_handler(event, context):
     actionGroup = event['actionGroup']
     function = event['function']
     parameters = event.get('parameters', [])
-    
-    
+    # responseBody = {
+    #     "TEXT": { "body": "Error, Function call didn't happen"}
+    # }
     print("Parameters: ", parameters)
     print('Function: ', function)
     if function == 'run_validator':
@@ -166,16 +145,6 @@ def lambda_handler(event, context):
         else:
             responseBody = {
                 "TEXT": {"body": "Error downloading guidance document"}
-            }
-    elif function == 'get_radiology_report':
-        report_text = get_radiology_report(parameters[0]["value"])
-        if report_text is not None:
-            responseBody = {
-                "TEXT": {"body": report_text}
-            }
-        else:
-            responseBody = {
-                "TEXT": {"body": "Error, report not found"}
             }
     else:
         responseBody = {
