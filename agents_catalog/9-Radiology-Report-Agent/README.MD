@@ -1,7 +1,14 @@
 ## Create an agent for Validating Radiology Report 
 A solution has been developed using Amazon Nova and Bedrock to revolutionize radiology reporting workflows. This system automates two critical tasks: validating reports against ACR guidelines and generating accurate impression summaries from findings. Using Retrieval Augmented Generation with a knowledge base of 90,000+ radiology reports, the solution ensures high-quality, compliant reporting. The system's effectiveness is validated through a comprehensive LLM-as-a-judge evaluation framework using Claude 3 Haiku, demonstrating consistent performance across multiple quality metrics. This automation can save radiologists 1-2 hours daily while being 75% more cost-effective than comparable solutions, ultimately improving healthcare delivery and reducing burnout.
 
-Please run the python notebook `create_agent.ipynb` for 
+Please run the python notebook `create_agent.ipynb` for creating the agent
+
+## Create a DynamoDB table
+Create a DynamoDB table with Key-Value pairs as *PatientId* and *Report*. A sample report is provided in the `sample_reports` folder.
+
+## Test Case0: Query with patient id
+Can you validate the radiology report for patient id 1179?"
+
 
 ## Test Case1: Chest Radiology Report
 Here is the radiology report: FINAL REPORT EXAMINATION : CHEST ( PORTABLE AP ) INDICATION : History :___ F with ett placement TECHNIQUE : Upright AP view of the chest COMPARISON : None . Patient is currently listed as EU critical . 
